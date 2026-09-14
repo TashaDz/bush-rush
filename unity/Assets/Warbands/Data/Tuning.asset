@@ -34,8 +34,8 @@ MonoBehaviour:
     outputExponent: 0.8
     chargePerFullSquad: 50
     soulsPerFighter: 1
-    ultimateCostPerFighter: 20
-    ultimateCostNecro: 30
+    ultimateCostPerFighter: 40
+    ultimateCostNecro: 60
     chargeMax: 1000
     ultimateCost: 100
     ultimateUnlockRound: 2

@@ -12,3 +12,7 @@
 
 Правила v0.2: бойцы по гексам (до 8 в гексе), каждый бежит к герою своим путём, удар — доля бьющих бойцов. 20 сидов, бот Normal. Диапазон **16–85** (Sustained Fire 85, Execution Chain 75, Storm Wall 69, Magic Eaters 59, Arcane Siege 58, Bone Tide 51, Rage Link 49, Lasting Light 45, Plague March 36, Radiant Line 28, Thunder Volley 28, Grave Cycle 16). Лимитов **0 %**, медиана 6 раундов, 29 действий на бой. Разброс тот же, что в §1, и по той же причине — HP героя (В3); поток бойцов сам по себе баланс не сдвинул, бои на раунд длиннее.
 
+## 3. Лавина: составы ×2, HP бойца ÷2, ёмкость гекса 16, ульта 40/60 (14.09) — `balance/matrix-12-presets-rush-v3-avalanche.txt`
+
+20 сидов, бот Normal. Диапазон **13–86** (Sustained Fire 86, Execution Chain 73, Storm Wall 71, Magic Eaters 64, Arcane Siege 56, Rage Link 49, Bone Tide 49, Lasting Light 48, Plague March 38, Thunder Volley 27, Radiant Line 26, Grave Cycle 13). Лимитов **0 %**, медиана 6 раундов, 29 действий. Картина §2 без сдвигов: удвоение бойцов при тех же HP пачек динамику не меняет; разброс задаёт HP героя (В3).
+

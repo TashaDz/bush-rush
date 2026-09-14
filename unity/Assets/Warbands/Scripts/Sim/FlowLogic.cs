@@ -10,7 +10,7 @@ namespace Warbands.Sim
     /// У каждого бойца своё HP (FighterHp), урон снимается с ближайших к атакующему; вражеские бойцы не стена — дерутся вперемешку в одном гексе.
     public static class FlowLogic
     {
-        public const int Cap = 8;   // бойцов одной стороны в гексе
+        public const int Cap = 16;   // бойцов одной стороны в гексе (14.09: составы ×2 — лавина)
 
         public static void InitFighters(BattleState s)
         {

@@ -97,18 +97,18 @@ namespace Warbands.Sim
         /// 07.09 (автор): численность ×2 при тех же MaxHP (Bone Cohort ×1.5, Clerics 14×20) — толпа гуще, динамика та же.
         public static readonly SquadDef[] V03 =
         {
-            S(SquadId.IronWardens, "Iron Wardens", "WARDENS", "Tank", Row.Front, UnitTag.Living, Reach.Melee, 10, 50, 100, DamageType.Physical, 3, Passive.None, "Sturdy front line"),
-            S(SquadId.BloodboundReavers, "Bloodbound Reavers", "REAVERS", "Berserker", Row.Front, UnitTag.Living, Reach.Melee, 11, 36, 130, DamageType.Physical, 6, Passive.SteadyOutput, "Attack never weakens from losses while alive"),
-            S(SquadId.BoneCohort, "Bone Cohort", "COHORT", "Expendable", Row.Front, UnitTag.Undead, Reach.Melee, 21, 14, 100, DamageType.Physical, 4, Passive.None, "Expendable undead; restore at normal rate"),
-            S(SquadId.Graveguard, "Graveguard", "GRAVEGUARD", "Undead tank", Row.Front, UnitTag.Undead, Reach.Melee, 7, 71, 90, DamageType.Physical, 2, Passive.None, "Sturdy undead"),
-            S(SquadId.RoyalArbalists, "Royal Arbalists", "ARBALISTS", "Archer", Row.Back, UnitTag.Living, Reach.Ranged, 10, 30, 140, DamageType.Physical, 6, Passive.None, "Ranged: hits any enemy squad"),
-            S(SquadId.ArmorbreakGunners, "Armorbreak Gunners", "GUNNERS", "Heavy gunner", Row.Back, UnitTag.Living, Reach.Ranged, 8, 37, 170, DamageType.Physical, 2, Passive.None, "Slow, heavy ranged hit"),
-            S(SquadId.VeilKnives, "Veil Knives", "KNIVES", "Assassin", Row.Front, UnitTag.Living, Reach.Assassin, 8, 37, 110, DamageType.Physical, 9, Passive.None, "Strikes through the front line"),
-            S(SquadId.PlagueCabal, "Plague Cabal", "CABAL", "Area attacker", Row.Back, UnitTag.Undead, Reach.Ranged, 8, 30, 55, DamageType.Magic, 3, Passive.None, "55 Magic to every enemy squad in both rows, or 55 to an exposed hero", aoeAll: true),
-            S(SquadId.DawnClerics, "Dawn Clerics", "CLERICS", "Healer", Row.Back, UnitTag.Living, Reach.Ranged, 7, 40, 50, DamageType.Magic, 5, Passive.None, "Heal 80 to a Living/Arcane ally or exposed hero, or 50 Magic", SupportKind.Heal, 80),
-            S(SquadId.Bonecallers, "Bonecallers", "CALLERS", "Restorer", Row.Back, UnitTag.Undead, Reach.Ranged, 8, 30, 50, DamageType.Magic, 5, Passive.None, "Restore 100 to a living Undead squad, or 50 Magic", SupportKind.Restore, 100),
-            S(SquadId.SpiritWeavers, "Spirit Weavers", "WEAVERS", "Attack booster", Row.Back, UnitTag.Living, Reach.Ranged, 8, 37, 50, DamageType.Magic, 7, Passive.None, "+40% to an ally squad's next attack, or 50 Magic", SupportKind.Empower, 40),
-            S(SquadId.SpellEaters, "Spell Eaters", "EATERS", "Fighter", Row.Front, UnitTag.Arcane, Reach.Melee, 6, 67, 140, DamageType.Magic, 4, Passive.None, "Sturdy fighter, 140 Magic"),
+            S(SquadId.IronWardens, "Iron Wardens", "WARDENS", "Tank", Row.Front, UnitTag.Living, Reach.Melee, 20, 25, 100, DamageType.Physical, 3, Passive.None, "Sturdy front line"),
+            S(SquadId.BloodboundReavers, "Bloodbound Reavers", "REAVERS", "Berserker", Row.Front, UnitTag.Living, Reach.Melee, 22, 18, 130, DamageType.Physical, 6, Passive.SteadyOutput, "Attack never weakens from losses while alive"),
+            S(SquadId.BoneCohort, "Bone Cohort", "COHORT", "Expendable", Row.Front, UnitTag.Undead, Reach.Melee, 42, 7, 100, DamageType.Physical, 4, Passive.None, "Expendable undead; restore at normal rate"),
+            S(SquadId.Graveguard, "Graveguard", "GRAVEGUARD", "Undead tank", Row.Front, UnitTag.Undead, Reach.Melee, 14, 36, 90, DamageType.Physical, 2, Passive.None, "Sturdy undead"),
+            S(SquadId.RoyalArbalists, "Royal Arbalists", "ARBALISTS", "Archer", Row.Back, UnitTag.Living, Reach.Ranged, 20, 15, 140, DamageType.Physical, 6, Passive.None, "Ranged: hits any enemy squad"),
+            S(SquadId.ArmorbreakGunners, "Armorbreak Gunners", "GUNNERS", "Heavy gunner", Row.Back, UnitTag.Living, Reach.Ranged, 16, 19, 170, DamageType.Physical, 2, Passive.None, "Slow, heavy ranged hit"),
+            S(SquadId.VeilKnives, "Veil Knives", "KNIVES", "Assassin", Row.Front, UnitTag.Living, Reach.Assassin, 16, 19, 110, DamageType.Physical, 9, Passive.None, "Strikes through the front line"),
+            S(SquadId.PlagueCabal, "Plague Cabal", "CABAL", "Area attacker", Row.Back, UnitTag.Undead, Reach.Ranged, 16, 15, 55, DamageType.Magic, 3, Passive.None, "55 Magic to every enemy squad in both rows, or 55 to an exposed hero", aoeAll: true),
+            S(SquadId.DawnClerics, "Dawn Clerics", "CLERICS", "Healer", Row.Back, UnitTag.Living, Reach.Ranged, 14, 20, 50, DamageType.Magic, 5, Passive.None, "Heal 80 to a Living/Arcane ally or exposed hero, or 50 Magic", SupportKind.Heal, 80),
+            S(SquadId.Bonecallers, "Bonecallers", "CALLERS", "Restorer", Row.Back, UnitTag.Undead, Reach.Ranged, 16, 15, 50, DamageType.Magic, 5, Passive.None, "Restore 100 to a living Undead squad, or 50 Magic", SupportKind.Restore, 100),
+            S(SquadId.SpiritWeavers, "Spirit Weavers", "WEAVERS", "Attack booster", Row.Back, UnitTag.Living, Reach.Ranged, 16, 19, 50, DamageType.Magic, 7, Passive.None, "+40% to an ally squad's next attack, or 50 Magic", SupportKind.Empower, 40),
+            S(SquadId.SpellEaters, "Spell Eaters", "EATERS", "Fighter", Row.Front, UnitTag.Arcane, Reach.Melee, 12, 34, 140, DamageType.Magic, 4, Passive.None, "Sturdy fighter, 140 Magic"),
         };
 
         /// Bush Rush (автор 14.09): лекари временно убраны из пачек — в колоды и на выбор не идут.

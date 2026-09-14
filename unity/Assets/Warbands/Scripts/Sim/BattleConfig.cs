@@ -39,8 +39,8 @@ namespace Warbands.Sim
         // §8.5 души
         public float chargePerFullSquad = 50f;
         public bool soulsPerFighter = true;          // автор 07.09: одна душа за одного потерянного бойца (вместо доли HP пачки); цена ульты — ultimateCostPerFighter
-        public float ultimateCostPerFighter = 20f;   // при численности ×2 (07.09) — 30; 11.09 (автор): составы −30 %, цена 20 для всех, кроме некроманта
-        public float ultimateCostNecro = 30f;        // Мортейн (Soul Harvest: ×2 душ за нежить) — цена прежняя
+        public float ultimateCostPerFighter = 40f;   // Bush Rush 14.09: бойцов ×2 → душ за потери ×2, цена ульты тоже (20 → 40, некро 30 → 60)   // при численности ×2 (07.09) — 30; 11.09 (автор): составы −30 %, цена 20 для всех, кроме некроманта
+        public float ultimateCostNecro = 60f;        // Мортейн (Soul Harvest: ×2 душ за нежить) — цена прежняя
         public float chargeMax = 1000f;             // Р13 (автор 06.09): заряды копятся, души не пропадают (было 200 = два применения)
         public float ultimateCost = 100f;
         public int ultimateUnlockRound = 2;
