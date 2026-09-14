@@ -25,3 +25,6 @@ unity/Assets/Resources/PerformanceTestRun*
 unity/Assets/Resources.meta
 unity/CI/formations.txt
 unity/CI/*_chain.txt
+unity/CI/chain.txt
+unity/CI/autoplay.txt
+unity/CI/matrix.csv

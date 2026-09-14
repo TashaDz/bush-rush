@@ -21,7 +21,7 @@ bush-rush/
 
 ## 3. Как продолжать
 1. `tools/build.sh all` — компиляция, forge, тесты, смоук, матрица, WebGL (~15 мин). Unity batch не параллелится (Temp/UnityLockfile).
-2. Локально: сервер `bush-rush-webgl` (порт 5188) в `../.claude/launch.json` → http://localhost:5188 (`?auto=1&seed=N` — бот против бота).
+2. Локально: сервер `bush-rush-webgl` (порт 5189) в `../.claude/launch.json` → http://localhost:5189 (`?auto=1&seed=N` — бот против бота).
 3. Выкладка: `tools/deploy.sh`.
 4. Крутилки: `BattleConfig` (`rushMode`, `turnTimeSeconds`, `bushRegrowTurns`, `bushBonuses/Max`, `ultimateCostPerFighter/Necro`, `rounds`), `BushStats.Speed/Range`, `BushGrid.HeroCell/Home`, камера — `Field3D.PlaceCamera`.
 
