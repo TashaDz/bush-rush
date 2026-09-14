@@ -8,17 +8,45 @@ namespace Warbands.Sim
     /// бежит к вражескому герою своим кратчайшим путём по расчищенному (могут разойтись по разным дорогам), ближник останавливается
     /// у первого встречного врага, дальник — когда кто-то в рейндже; бьют того, кого встретили (герой в приоритете).
     /// У каждого бойца своё HP (FighterHp), урон снимается с ближайших к атакующему; вражеские бойцы не стена — дерутся вперемешку в одном гексе.
+    /// Ёмкость гекса Cap = 4 (автор 14.09): бойцы крупные, отряд на старте стоит лагерем на нескольких гексах.
     public static class FlowLogic
     {
-        public const int Cap = 16;   // бойцов одной стороны в гексе (14.09: составы ×2 — лавина)
+        public const int Cap = 4;   // бойцов одной стороны в гексе (автор 14.09: «до 4 юнитов на гексе», бойцы крупные)
 
+        /// Расстановка (автор 14.09: «разнеси на несколько гексов»): бойцы отряда лагерем вокруг домашнего гекса — по Cap в гекс,
+        /// ближние к дому первыми, при равенстве — подальше от вражеского героя (лагерь растёт к своему краю, а не вперёд); кусты под лагерем расчищены.
         public static void InitFighters(BattleState s)
         {
             foreach (var sd in s.Sides) foreach (var q in sd.Squads)
             {
                 q.Fighters = new List<Cell>(); q.FighterHp = new List<int>(); int left = q.Hp, hpf = q.Squad.HpPerFighter;
-                while (left > 0) { q.Fighters.Add(q.Cell); q.FighterHp.Add(Math.Min(hpf, left)); left -= hpf; }
+                var eh = s.Sides[1 - sd.Index].Hero; var home = q.Cell;
+                var cells = new List<Cell>();
+                for (int y = 0; y < BushGrid.Rows; y++) for (int x = 0; x < BushGrid.Cols; x++) { var c = new Cell(x, y); if (!s.Bushes.IsObstacle(c) && !IsHeroCell(s, c)) cells.Add(c); }
+                cells.Sort((a, b) => { int d = BushGrid.Steps(a, home).CompareTo(BushGrid.Steps(b, home)); if (d != 0) return d; d = eh != null ? BushGrid.Steps(b, eh.Cell).CompareTo(BushGrid.Steps(a, eh.Cell)) : 0; return d != 0 ? d : BushGrid.Index(a).CompareTo(BushGrid.Index(b)); });
+                int ci = 0;
+                while (left > 0)
+                {
+                    while (ci < cells.Count - 1 && OwnAt(s, cells[ci], sd.Index) >= Cap) ci++;
+                    var at = cells[ci]; s.Bushes.Clear(at, -1000);
+                    q.Fighters.Add(at); q.FighterHp.Add(Math.Min(hpf, left)); left -= hpf;
+                }
+                q.Cell = Front(s, q);
             }
+        }
+        static bool IsHeroCell(BattleState s, Cell c) { foreach (var sd in s.Sides) if (sd.Hero != null && sd.Hero.Cell == c) return true; return false; }
+
+        /// Гекс для нового бойца рядом с at: сам at, если там есть место, иначе ближайший проходимый с местом (BFS по расчищенному); нет такого — at.
+        public static Cell PlaceNear(BattleState s, int side, Cell at)
+        {
+            if (OwnAt(s, at, side) < Cap) return at;
+            var seen = new HashSet<Cell> { at }; var q = new Queue<Cell>(); q.Enqueue(at);
+            while (q.Count > 0)
+            {
+                var c = q.Dequeue();
+                foreach (var n in BushGrid.Neighbors(c)) { if (seen.Contains(n) || !Passable(s, n, side)) continue; if (OwnAt(s, n, side) < Cap) return n; seen.Add(n); q.Enqueue(n); }
+            }
+            return at;
         }
 
         /// Сколько своих бойцов стоит в гексе.
@@ -139,7 +167,7 @@ namespace Warbands.Sim
                     int add = Math.Min(hpf - u.FighterHp[wi], gain); u.FighterHp[wi] += add; gain -= add;
                 }
                 int k = 0;
-                while (gain > 0) { var at = u.Fighters.Count > 0 ? u.Fighters[k++ % u.Fighters.Count] : u.Cell; int add = Math.Min(hpf, gain); u.Fighters.Add(at); u.FighterHp.Add(add); gain -= add; }
+                while (gain > 0) { var at = PlaceNear(s, u.Side, u.Fighters.Count > 0 ? u.Fighters[k++ % u.Fighters.Count] : u.Cell); int add = Math.Min(hpf, gain); u.Fighters.Add(at); u.FighterHp.Add(add); gain -= add; }   // новые бойцы — где есть место (Cap)
             }
             // ровно Count бойцов: лишние (несколько неполных) сливаются в ближайшего неполного
             while (u.Fighters.Count > u.Count && u.Fighters.Count > 1)

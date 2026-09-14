@@ -46,7 +46,7 @@ namespace Warbands.Sim
             if (!BushGrid.Inside(c) || s.Bushes.IsObstacle(c) || (s.Bushes.IsBush(c) && (alsoOpen == null || !alsoOpen.Contains(c)))) return false;
             var o = OccupantAt(s, c); return o == null || (o.Side == side && !o.IsHero);   // свой герой — тоже стена
         }
-        public static bool CanStand(BattleState s, Cell c, Unit actor) { if (s.Cfg.rushMode) return FlowLogic.EnemyAt(s, c, actor.Side) == null && FlowLogic.OwnAt(s, c, actor.Side) < FlowLogic.Cap; var o = OccupantAt(s, c); return o == null || o == actor; }
+        public static bool CanStand(BattleState s, Cell c, Unit actor) { if (s.Cfg.rushMode) return FlowLogic.Passable(s, c, actor.Side, new HashSet<Cell> { c }) && FlowLogic.OwnAt(s, c, actor.Side) < FlowLogic.Cap; /* Bush Rush: враг в гексе не мешает встать (куст — расчистят), герои — стена */ var o = OccupantAt(s, c); return o == null || o == actor; }
 
         // ---------- BFS по расчищенным ----------
 
@@ -515,7 +515,7 @@ namespace Warbands.Sim
                 foreach (var n in BushGrid.Neighbors(c))
                 {
                     if (s.Bushes.IsObstacle(n)) continue;
-                    var o = OccupantAt(s, n); if (o != null && o.Side != side) continue;
+                    var o = OccupantAt(s, n); if (s.Cfg.rushMode ? (o != null && o.IsHero) : (o != null && o.Side != side)) continue;   // Bush Rush: стена — только герои, вражеские бойцы — нет (дерёмся вперемешку)
                     int nd = dist[c] + 1 + (s.Bushes.IsBush(n) ? BushCost : 0);
                     if (dist.TryGetValue(n, out int old) && old <= nd) continue;
                     dist[n] = nd; prev[n] = c; Push(n, nd);
@@ -589,7 +589,7 @@ namespace Warbands.Sim
         {
             var b = s.Bushes; if (b == null) return;
             int nObs = s.Cfg.bushObstacles, nBon = s.Cfg.bushBonuses;
-            var units = new List<Cell>(); foreach (var sd in s.Sides) { foreach (var q in sd.Squads) if (q.Alive) units.Add(q.Cell); if (s.Cfg.rushMode && sd.Hero != null) units.Add(sd.Hero.Cell); }
+            var units = new List<Cell>(); foreach (var sd in s.Sides) { foreach (var q in sd.Squads) if (q.Alive) { units.Add(q.Cell); if (s.Cfg.rushMode && q.Fighters != null) foreach (var f in q.Fighters) if (!units.Contains(f)) units.Add(f); } if (s.Cfg.rushMode && sd.Hero != null) units.Add(sd.Hero.Cell); }   // Bush Rush: лагерь бойцов тоже без препятствий
             for (int attempt = 0; attempt < 40 && nObs > 0; attempt++)
             {
                 var obs = new HashSet<Cell>();

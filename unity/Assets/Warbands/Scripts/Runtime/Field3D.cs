@@ -59,7 +59,7 @@ namespace Warbands
             public readonly List<FigJob> Jobs = new List<FigJob>();   // бег бойцов по своим путям («как вода»)
             public int ShownHp; public float Punch;   // всплеск масштаба при ударе/попадании
             public Vector3 Centroid;                   // центр видимых бойцов (плашка HP, прицел)
-            public Vector3 HeadPos => Centroid + Vector3.up * (Unit != null && Unit.IsHero ? 1.5f : 0.4f);
+            public Vector3 HeadPos => Centroid + Vector3.up * (Unit != null && Unit.IsHero ? 1.5f : 1.0f);   // бойцы ×4 (14.09)
         }
         public sealed class FigJob { public Transform Fig; public Vector3 From; public List<Vector3> Path; public float Start, End; }
         public sealed class Lunge { public Transform Fig; public Vector3 From, To; public float Start; }   // выпад к врагу и назад (0.44 с)
@@ -180,9 +180,39 @@ namespace Warbands
             LayoutFigs(v);
             return v;
         }
-        /// Боец i внутри своего гекса: смещение по сиду (до Cap бойцов в гексе не слипаются).
-        static Vector3 FigOffset(Unit u, int i) { float a = Hash(u.Index * 31 + i, u.Side * 7 + 1) * 6.283f, r = 0.06f + 0.36f * Mathf.Sqrt(Hash(i * 5 + 2, u.Index * 13 + 5)); return new Vector3(Mathf.Cos(a) * r, 0.11f, Mathf.Sin(a) * r * 0.85f); }   // бойцы вдвое мельче (14.09) — до 16 в гексе
-        Vector3 FigWorld(Unit u, int i) => CellPos(u.Fighters != null && i < u.Fighters.Count ? u.Fighters[i] : u.Cell) + FigOffset(u, i);
+        /// Слоты 2×2 в гексе (автор 14.09: бойцы ×4, до 4 в гексе); когда в гексе есть и враг, свои жмутся к своему краю (игрок — вниз), враг — к своему.
+        public const float FigY = 0.35f;   // центр цилиндра высотой 0.64 над землёй
+        static Vector3 SlotOffset(int slot, int side, bool mixed)
+        {
+            float x = (slot & 1) == 0 ? -0.2f : 0.2f, z = (slot & 2) == 0 ? -0.17f : 0.17f;
+            if (mixed) { x *= 0.9f; z = z * 0.55f + (side == 0 ? -0.24f : 0.24f); }
+            return new Vector3(x, FigY, z);
+        }
+        /// Смещение бойца i на промежуточных гексах пути — слот по индексу (на месте назначения LayoutFigs пересчитает по соседям).
+        static Vector3 FigOffset(Unit u, int i) => SlotOffset((i + u.Index) & 3, u.Side, false);
+        /// Слот бойца i в его гексе: порядок среди бойцов своей стороны в этом гексе (отряды по порядку views, бойцы по индексу), по кругу из 4.
+        int SlotOf(UnitView v, int i, Cell c)
+        {
+            int n = 0;
+            foreach (var w in views)
+            {
+                var wu = w.Unit; if (wu == null || wu.IsHero || wu.Side != v.Unit.Side || !wu.Alive || wu.Fighters == null || !w.Root.gameObject.activeSelf) continue;
+                int lim = w == v ? i : wu.Fighters.Count;
+                for (int k = 0; k < lim && k < wu.Fighters.Count; k++) if (wu.Fighters[k] == c) n++;
+                if (w == v) break;
+            }
+            return n & 3;
+        }
+        bool MixedCell(Cell c, int side)
+        {
+            foreach (var w in views) { var wu = w.Unit; if (wu == null || wu.IsHero || wu.Side == side || !wu.Alive || wu.Fighters == null) continue; if (wu.Fighters.Contains(c)) return true; }
+            return false;
+        }
+        Vector3 FigWorld(UnitView v, int i)
+        {
+            var u = v.Unit; var c = u.Fighters != null && i < u.Fighters.Count ? u.Fighters[i] : u.Cell;
+            return CellPos(c) + SlotOffset(SlotOf(v, i, c), u.Side, MixedCell(c, u.Side));
+        }
         /// Бойцы по своим гексам (Unit.Fighters); герой — один большой блок на своём гексе. Не трогает бойцов, которые сейчас бегут.
         void LayoutFigs(UnitView v)
         {
@@ -190,7 +220,7 @@ namespace Warbands
             while (v.Figs.Count < n)
             {
                 var f = Prim("F", u.IsHero ? boxMesh : pawnMesh, u.IsHero ? (u.Side == 0 ? assets.heroBlue : assets.heroRed) : (u.Side == 0 ? assets.blue : assets.red), v.Root);
-                f.localScale = u.IsHero ? new Vector3(0.7f, 1.2f, 0.7f) : new Vector3(0.085f, 0.16f, 0.085f);   // ×0.5 (14.09: лавина)
+                f.localScale = u.IsHero ? new Vector3(0.7f, 1.2f, 0.7f) : new Vector3(0.34f, 0.64f, 0.34f);   // автор 14.09: боец ×4, до 4 в гексе
                 if (!u.IsHero) MakeIcon(f, u);
                 v.Figs.Add(f);
             }
@@ -199,7 +229,7 @@ namespace Warbands
             {
                 bool active = i < n; if (v.Figs[i].gameObject.activeSelf != active) v.Figs[i].gameObject.SetActive(active); if (!active) continue;
                 bool running = false; foreach (var j in v.Jobs) if (j.Fig == v.Figs[i]) { running = true; break; }
-                if (!running) v.Figs[i].position = u.IsHero ? CellPos(u.Cell) + new Vector3(0f, 0.6f, 0f) : FigWorld(u, i);
+                if (!running) v.Figs[i].position = u.IsHero ? CellPos(u.Cell) + new Vector3(0f, 0.6f, 0f) : FigWorld(v, i);
                 sum += v.Figs[i].position; on++;
             }
             v.Centroid = on > 0 ? sum / on : CellPos(u.Cell);
@@ -214,7 +244,7 @@ namespace Warbands
             else if (d.DamageType == DamageType.Magic || d.IsSupport) { tex = assets.iconWand; col = new Color(0.8f, 0.7f, 1f); }
             else { tex = assets.iconBow; col = new Color(1f, 0.78f, 0.5f); }
             if (tex == null) return;
-            var q = Prim("Icon", quadMesh, assets.decal, root); q.localScale = new Vector3(0.13f, 0.13f, 1f);
+            var q = Prim("Icon", quadMesh, assets.decal, root); q.localScale = new Vector3(0.36f, 0.36f, 1f);   // бойцы ×4 (14.09)
             var mr = q.GetComponent<MeshRenderer>(); mr.GetPropertyBlock(mpb); mpb.SetTexture("_BaseMap", tex); mpb.SetColor("_BaseColor", col); mpb.SetColor("_Color", col); mr.SetPropertyBlock(mpb);
             icons[fig] = q;
         }
@@ -225,13 +255,13 @@ namespace Warbands
             {
                 var fig = kv.Key; var q = kv.Value; bool on = fig.gameObject.activeInHierarchy;
                 if (q.gameObject.activeSelf != on) q.gameObject.SetActive(on); if (!on) continue;
-                q.position = fig.position + Vector3.up * 0.19f; q.rotation = rot;
+                q.position = fig.position + Vector3.up * 0.56f; q.rotation = rot;
             }
         }
         /// Клякса на земле в месте гибели бойца: цвет стороны, случайный поворот, тает.
         void Splat(Vector3 at, int side)
         {
-            var q = Prim("Splat", quadMesh, assets.decal, root); float sc = 0.22f + Hash(splats.Count, (int)(at.x * 10f)) * 0.2f;
+            var q = Prim("Splat", quadMesh, assets.decal, root); float sc = 0.45f + Hash(splats.Count, (int)(at.x * 10f)) * 0.3f;
             q.position = new Vector3(at.x, 0.03f, at.z); q.rotation = Quaternion.Euler(90f, Hash((int)(at.z * 10f), splats.Count) * 360f, 0f); q.localScale = new Vector3(sc, sc, 1f);
             var mr = q.GetComponent<MeshRenderer>(); mr.GetPropertyBlock(mpb); mpb.SetTexture("_BaseMap", splatTex);
             var col = side == 0 ? new Color(0.2f, 0.4f, 1f, 0.85f) : new Color(0.95f, 0.15f, 0.2f, 0.85f); mpb.SetColor("_BaseColor", col); mpb.SetColor("_Color", col); mr.SetPropertyBlock(mpb);
@@ -322,10 +352,20 @@ namespace Warbands
                             timed.Add((start, () =>
                             {
                                 v.Jobs.Clear();
+                                // бойцы в событии идут в порядке сима (передние первыми) — каждому пути берём ближайшую к его старту фигурку, и в этом порядке
+                                // переставляем Figs, чтобы после бега Figs[i] соответствовал Fighters[i] (иначе фигурки менялись бы местами скачком)
+                                var free = new List<Transform>(v.Figs); var ordered = new List<Transform>();
+                                for (int i = 0; i < runs.Count; i++)
+                                {
+                                    var sp = CellPos(runs[i].start); Transform pick = null; float bd = float.MaxValue;
+                                    foreach (var f in free) { float d2 = (f.position - sp).sqrMagnitude; if (d2 < bd) { bd = d2; pick = f; } }
+                                    if (pick == null) break; free.Remove(pick); ordered.Add(pick);
+                                }
+                                ordered.AddRange(free); v.Figs.Clear(); v.Figs.AddRange(ordered);
                                 for (int i = 0; i < runs.Count && i < v.Figs.Count; i++)
                                 {
                                     var (st, path) = runs[i]; if (path.Count == 0) continue;
-                                    var pts = new List<Vector3>(); foreach (var c in path) pts.Add(CellPos(c) + FigOffset(u, i));
+                                    var pts = new List<Vector3>(); for (int j = 0; j < path.Count; j++) pts.Add(j == path.Count - 1 ? FigWorld(v, i) : CellPos(path[j]) + FigOffset(u, i));
                                     float d = (0.3f + path.Count * cfg.bushStepSeconds) * k;
                                     v.Jobs.Add(new FigJob { Fig = v.Figs[i], From = v.Figs[i].position, Path = pts, Start = Time.unscaledTime, End = Time.unscaledTime + d });
                                 }
