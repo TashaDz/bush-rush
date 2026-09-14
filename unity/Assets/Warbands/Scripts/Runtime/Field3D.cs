@@ -49,7 +49,8 @@ namespace Warbands
         readonly Transform[] bushes = new Transform[BushGrid.Cols * BushGrid.Rows], obstacles = new Transform[BushGrid.Cols * BushGrid.Rows], bonuses = new Transform[BushGrid.Cols * BushGrid.Rows];
         readonly float[] bushScale = new float[BushGrid.Cols * BushGrid.Rows], bushTarget = new float[BushGrid.Cols * BushGrid.Rows];
         readonly bool[] pendingRegrow = new bool[BushGrid.Cols * BushGrid.Rows], reachMask = new bool[BushGrid.Cols * BushGrid.Rows];
-        Mesh hexMesh, boxMesh, sphereMesh, pawnMesh;   // меши свои (процедурные): встроенные примитивы в WebGL-билд не попадают
+        Mesh hexMesh, grassMesh, boxMesh, sphereMesh, pawnMesh;   // меши свои (процедурные): встроенные примитивы в WebGL-билд не попадают
+        public const float GrassH = 0.45f;   // толщина травы
         MaterialPropertyBlock mpb;
 
         public sealed class UnitView
@@ -71,7 +72,7 @@ namespace Warbands
             root = new GameObject("Field").transform; root.SetParent(transform, false);
             Debug.Log($"[SW] field: gfx={SystemInfo.graphicsDeviceType} mats={(assets != null && assets.ground != null && assets.ground.shader != null ? assets.ground.shader.name : "NONE")}");
             mpb = new MaterialPropertyBlock();
-            hexMesh = BuildHexMesh(); boxMesh = GreyMeshes.Box(); sphereMesh = GreyMeshes.Sphere(14, 10); pawnMesh = GreyMeshes.Cylinder(10);
+            hexMesh = BuildHexMesh(); grassMesh = BuildHexPrism(GrassH); boxMesh = GreyMeshes.Box(); sphereMesh = GreyMeshes.Sphere(14, 10); pawnMesh = GreyMeshes.Cylinder(10);
             // земля
             var ground = Prim("Ground", boxMesh, assets.ground, root);
             ground.localScale = new Vector3(40f, 0.2f, 40f); ground.localPosition = new Vector3(0f, -0.12f, 0f);
@@ -82,9 +83,10 @@ namespace Warbands
                 var c = new Cell(x, y); int i = BushGrid.Index(c); var p = CellPos(c);
                 var tile = new GameObject($"Tile_{x}_{y}", typeof(MeshFilter), typeof(MeshRenderer)); tile.transform.SetParent(tilesRoot, false); tile.transform.localPosition = p + Vector3.up * 0.01f;
                 tile.GetComponent<MeshFilter>().sharedMesh = hexMesh; var mr = tile.GetComponent<MeshRenderer>(); mr.sharedMaterial = assets.sand; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; Tint(mr, assets.sand); tiles[i] = mr;
-                // куст: блок со случайным поворотом и лёгким разбросом размера — органичнее
-                var b = Prim("Bush", boxMesh, assets.bush, tilesRoot); float k = 0.8f + Hash(x, y) * 0.15f;
-                b.localPosition = p + Vector3.up * 0.22f; b.localRotation = Quaternion.Euler(0f, Hash(y, x) * 60f, 0f); b.localScale = new Vector3(0.78f * k, 0.44f, 0.78f * k);
+                // трава сплошная (автор 14.09): шестигранная призма ровно по гексу, соседние смыкаются в единый ковёр толщиной GrassH;
+                // расчищенный гекс — вырез в ковре с вертикальными стенками, как в референсе Castle Raid
+                var b = Prim("Grass", grassMesh, assets.bush, tilesRoot);
+                b.localPosition = p; b.localScale = Vector3.one;
                 bushes[i] = b; bushScale[i] = bushTarget[i] = 1f;
                 var o = Prim("Obstacle", boxMesh, assets.obstacle, tilesRoot); o.localPosition = p + Vector3.up * 0.35f; o.localScale = new Vector3(0.9f, 0.7f, 0.9f); o.gameObject.SetActive(false); obstacles[i] = o;
                 var bn = Prim("Bonus", sphereMesh, assets.gold, tilesRoot); bn.localPosition = p + Vector3.up * 0.4f; bn.localScale = Vector3.one * 0.38f; bn.gameObject.SetActive(false); bonuses[i] = bn;
@@ -109,6 +111,22 @@ namespace Warbands
         void Tint(MeshRenderer mr, Material mat) { if (mat == null) return; var c = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : mat.color; Tint(mr, c); }
         void Tint(MeshRenderer mr, Color c) { mr.GetPropertyBlock(mpb); mpb.SetColor("_BaseColor", c); mpb.SetColor("_Color", c); mr.SetPropertyBlock(mpb); }
 
+        /// Шестигранная призма по гексу (pointy-top, ширина 1): верх, стенки; низ не нужен. Радиус точный — соседи смыкаются.
+        static Mesh BuildHexPrism(float h)
+        {
+            float r = HexH / 2f; var v = new List<Vector3>(); var n = new List<Vector3>(); var t = new List<int>();
+            var ring = new Vector3[6]; for (int k = 0; k < 6; k++) { float a = Mathf.PI / 6f + k * Mathf.PI / 3f; ring[k] = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r); }
+            int c0 = v.Count; v.Add(new Vector3(0f, h, 0f)); n.Add(Vector3.up);
+            for (int k = 0; k < 6; k++) { v.Add(ring[k] + Vector3.up * h); n.Add(Vector3.up); }
+            for (int k = 0; k < 6; k++) { t.Add(c0); t.Add(c0 + 1 + (k + 1) % 6); t.Add(c0 + 1 + k); }
+            for (int k = 0; k < 6; k++)
+            {
+                var a = ring[k]; var b = ring[(k + 1) % 6]; var nrm = Vector3.Cross(Vector3.up, b - a).normalized; nrm = -nrm;
+                int i0 = v.Count; v.Add(a); v.Add(b); v.Add(b + Vector3.up * h); v.Add(a + Vector3.up * h); for (int q = 0; q < 4; q++) n.Add(nrm);
+                t.Add(i0); t.Add(i0 + 2); t.Add(i0 + 1); t.Add(i0); t.Add(i0 + 3); t.Add(i0 + 2);
+            }
+            var m = new Mesh(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(t, 0); m.RecalculateBounds(); return m;
+        }
         static Mesh BuildHexMesh()
         {
             // pointy-top, ширина 1: радиус 1/√3, вершины сверху и снизу (по z)
@@ -162,7 +180,8 @@ namespace Warbands
             SetPending(PendingRegrow(b));
         }
 
-        Vector3 BushScaleVec(int i, float k) { float s = 0.8f + Hash(i % BushGrid.Cols, i / BushGrid.Cols) * 0.15f; return new Vector3(0.78f * s * k, 0.44f * k, 0.78f * s * k); }
+        /// Рост/срез травы — по высоте призмы (ковёр не расходится в стороны).
+        static Vector3 BushScaleVec(int i, float k) => new Vector3(1f, Mathf.Max(0.001f, k), 1f);
 
         UnitView BuildUnit(Unit u)
         {
