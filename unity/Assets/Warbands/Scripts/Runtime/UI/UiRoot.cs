@@ -36,12 +36,11 @@ namespace Warbands.UI
             home = new HomeScreen(runner, safe);
             hud = new RushHud(runner, safe, field, frame);
 
-            // тёмные полосы по бокам на широком экране — на системном канвасе поверх всего
             var sysGo = new GameObject("Canvas_System", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster)); sysGo.transform.SetParent(transform, false);
             var sc = sysGo.GetComponent<Canvas>(); sc.renderMode = RenderMode.ScreenSpaceOverlay; sc.sortingOrder = 20;
             var ss = sysGo.GetComponent<CanvasScaler>(); ss.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; ss.referenceResolution = new Vector2(Theme.W, Theme.H); ss.matchWidthOrHeight = 0.5f;
             var sysRt = sysGo.GetComponent<RectTransform>();
-            frameFit.BarLeft = SideBar(sysRt, "Bar_Left", 0f); frameFit.BarRight = SideBar(sysRt, "Bar_Right", 1f);
+            // полос по бокам нет (автор 14.09: «на весь экран») — 3D рисуется на всё окно, HUD остаётся в колонке 9:16 по центру
             home.Hide(); hud.Hide();
         }
 

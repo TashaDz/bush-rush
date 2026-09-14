@@ -127,8 +127,8 @@ namespace Warbands
         {
             if (cam == null) return;
             cam.orthographic = false; cam.nearClipPlane = 0.3f; cam.farClipPlane = 60f;
-            cam.transform.position = new Vector3(0f, 12.4f, -8.4f);
-            cam.transform.LookAt(new Vector3(0f, 0f, 1.15f));   // выше середины: своё поле уходит из-под нижних полосок HUD, герой врага — под верхней
+            cam.transform.position = new Vector3(0f, 12.9f, -7.6f);
+            cam.transform.LookAt(new Vector3(0f, 0f, 0.9f));   // выше середины: своё поле уходит из-под нижних полосок HUD, герой врага — под верхней
             ApplyViewport();
         }
         int lastW, lastH;
@@ -136,10 +136,10 @@ namespace Warbands
         {
             if (cam == null) return;
             float w = Screen.width, h = Screen.height; if (w < 1f || h < 1f) return;
-            float aspect = 1080f / 1920f; float colW = h * aspect;
-            cam.rect = w > colW ? new Rect((w - colW) / 2f / w, 0f, colW / w, 1f) : new Rect(0f, 0f, 1f, 1f);   // колонка 9:16 по центру, как PortraitFrame
-            // горизонтальный угол обзора постоянный (поле 6.5 гексов влезает по ширине), вертикальный — от аспекта колонки
-            float colAspect = Mathf.Min(w, colW) / h; const float HFov = 28f;
+            // автор 14.09: «растяни на весь экран» — камера рисует на всё окно; поле по ширине подгоняется под колонку 9:16 (на широком экране по бокам видна трава)
+            cam.rect = new Rect(0f, 0f, 1f, 1f);
+            float aspect = 1080f / 1920f; float colW = Mathf.Min(w, h * aspect);
+            float colAspect = colW / h; const float HFov = 25.5f;   // поле 6.5 гексов чуть плотнее к краям колонки
             cam.fieldOfView = 2f * Mathf.Atan(Mathf.Tan(HFov * 0.5f * Mathf.Deg2Rad) / colAspect) * Mathf.Rad2Deg;
             lastW = Screen.width; lastH = Screen.height;
         }
