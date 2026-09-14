@@ -116,7 +116,7 @@ namespace Warbands.EditorTools
             { Debug.LogError("[SW] TMP Essential Resources missing — run tools/build.sh forge (extracts the package)"); EditorApplication.Exit(1); }
 
             var camGo = new GameObject("Main Camera", typeof(Camera)); camGo.tag = "MainCamera";
-            var cam = camGo.GetComponent<Camera>(); cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.07f, 0.09f, 0.14f);
+            var cam = camGo.GetComponent<Camera>(); cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.36f, 0.6f, 0.33f);   // в цвет травы: горизонт за ковром не бросается в глаза
             camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
             var lightGo = new GameObject("Sun", typeof(Light)); var light = lightGo.GetComponent<Light>(); light.type = LightType.Directional; light.intensity = 1.1f; light.color = new Color(1f, 0.97f, 0.9f);
             lightGo.transform.rotation = Quaternion.Euler(55f, -30f, 0f); light.shadows = LightShadows.Soft;

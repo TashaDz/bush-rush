@@ -1,6 +1,8 @@
 == compile
 compile ok
+== forge
+forge ok
 == webgl
-webgl stamp 202609141421
+webgl stamp 202609141425
 webgl ok release 11.3 MB → Builds/WebGL
 CHAIN_DONE

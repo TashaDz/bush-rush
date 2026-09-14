@@ -90,7 +90,7 @@ namespace Warbands
             // трава (автор 14.09): мягкий сплошной ковёр с текстурой — сетка высот по уровням гексов, края плавные, свет запечён в вершины
             carpet = new GrassCarpet(root, assets.grassSoft, bushScale, reachMask);
             // прицел хода (из Warbands): кольцо на всё поле сужается на ходящий отряд и остаётся под ним
-            reticle = Prim("Reticle", GreyMeshes.Ring(0.78f, 1f, 40), assets.decal, root); reticle.gameObject.SetActive(false);
+            reticle = Prim("Reticle", GreyMeshes.Ring(0.34f, 0.46f, 40), assets.decal, root); reticle.gameObject.SetActive(false);   // кольцо внутри гекса (внутренний радиус гекса 0.5), иначе прячется под травой
             PlaceCamera();
         }
         GrassCarpet carpet; Transform reticle; Ref reticleFor = Ref.None; float reticleT = -1f; bool reticleMine;
@@ -325,10 +325,11 @@ namespace Warbands
             if (!actor.Ref.Equals(reticleFor)) { reticleFor = actor.Ref; reticleT = 0f; reticleMine = actor.Side == 0; reticle.gameObject.SetActive(true); }
             var v = View(actor.Ref); if (v == null) return;
             reticleT += dt; float size, alpha;
-            if (reticleT < TurnIn) { float k = reticleT / TurnIn; float e = 1f - (1f - k) * (1f - k) * (1f - k); size = Mathf.Lerp(9f, 1f, e); alpha = Mathf.Lerp(0.35f, 1f, e); }
+            if (reticleT < TurnIn) { float k = reticleT / TurnIn; float e = 1f - (1f - k) * (1f - k) * (1f - k); size = Mathf.Lerp(16f, 1f, e); alpha = Mathf.Lerp(0.35f, 1f, e); }
             else if (reticleT < TurnIn + TurnHold) { float k = (reticleT - TurnIn) / TurnHold; size = 1f + 0.1f * Mathf.Sin(k * Mathf.PI); alpha = 1f; }
             else { size = 1f + 0.03f * Mathf.Sin(now * 4f); alpha = 0.85f; }
-            reticle.position = v.Root.position + Vector3.up * 0.05f; reticle.localScale = new Vector3(size, 1f, size);
+            float land = Mathf.Clamp01(reticleT / TurnIn); reticle.position = v.Root.position + Vector3.up * Mathf.Lerp(GrassH + 0.08f, 0.06f, land);   // летит над травой, садится на землю у ног
+            reticle.localScale = new Vector3(size, 1f, size);
             reticle.localRotation = Quaternion.Euler(0f, (1f - Mathf.Clamp01(reticleT / TurnIn)) * 90f, 0f);
             var col = reticleMine ? new Color(1f, 0.85f, 0.24f, alpha) : new Color(1f, 0.36f, 0.36f, alpha);
             Tint(reticle.GetComponent<MeshRenderer>(), col);
@@ -441,6 +442,7 @@ namespace Warbands
                     var p = Field3D.CellPos(new Cell(cx, cy)); float dist = Mathf.Sqrt((p.x - x) * (p.x - x) + (p.z - z) * (p.z - z));
                     float t = Mathf.Max(0f, 1f - dist / 0.95f); wk[q] = t * t; sum += wk[q];
                 }
+                if (sum < 1e-3f) { nearX[k] = -100; nearY[k] = -100; wk[0] = 1f; sum = 1f; }   // вдали от всех гексов — сплошная трава (иначе нулевые веса давали «расчищено»)
                 for (int q = 0; q < 7; q++) weights[k * 7 + q] = wk[q] / Mathf.Max(sum, 1e-4f);
                 noise[k] = Noise(x * 1.7f, z * 1.7f) * 0.6f + Noise(x * 5.1f, z * 5.1f) * 0.4f;
                 tips[k] = Hash(i * 7 + 3, j * 13 + 1);
