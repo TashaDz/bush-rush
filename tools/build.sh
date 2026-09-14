@@ -21,7 +21,8 @@ step() {
 run_tests() {   # $1 — EditMode|PlayMode, $2 — имя шага (файлы CI/$2.xml/.log), $3 — фильтр тестов (опционально)
   echo "== $2"
   rm -f "$P/CI/$2.xml"
-  "$U" -batchmode -nographics -projectPath "$P" -runTests -testPlatform "$1" ${3:+-testFilter "$3"} \
+  GFX="-nographics"; [ "$SHOT" = "1" ] && GFX=""   # SHOT=1 — с графикой (снимок камеры в CI/smoke.png)
+  "$U" -batchmode $GFX -projectPath "$P" -runTests -testPlatform "$1" ${3:+-testFilter "$3"} \
     -testResults "$P/CI/$2.xml" -logFile "$P/CI/$2.log" >/dev/null 2>&1 || true
   [ -f "$P/CI/$2.xml" ] || { echo "нет CI/$2.xml"; grep -n "error CS\|Exception" "$P/CI/$2.log" | head; exit 1; }
   python3 - "$P/CI/$2.xml" "$2" <<'PY'

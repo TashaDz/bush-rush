@@ -9,7 +9,7 @@
 ```
 bush-rush/
 ├── GDD.md / HANDOFF.md / ROADMAP.md / BALANCE.md ; balance/ (отчёты прогонов)
-├── tools/build.sh   compile | forge (AUTOPLAY=1 — игрок тоже бот) | tests | smoke (PlayMode: сцена + 6 с автоплея) | autoplay (SEEDS=, BOT=strong, TUNE='{json}') | webgl (DEV=1) | all
+├── tools/build.sh   compile | forge (AUTOPLAY=1 — игрок тоже бот) | tests | smoke (PlayMode: сцена + 6 с автоплея; SHOT=1 — с графикой и снимком камеры в unity/CI/smoke.png) | autoplay (SEEDS=, BOT=strong, TUNE='{json}') | webgl (DEV=1) | all
 ├── tools/deploy.sh  → deploy/ (клон bush-rush-web, orphan-коммит, push --force)
 └── unity/Assets/Warbands/Scripts
     ├── Sim/        общий сим Warbands (BattleConfig.rushMode: герои на поле, цель — вражеский герой, без отхода, конец — смерть героя; BushField.HeroCell/Home, BushLogic.PlanMove rush-ветка, Enemies/EnemyHero/AnyEnemyInRange)

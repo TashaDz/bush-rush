@@ -23,8 +23,22 @@ namespace Warbands.PlayTests
             yield return null;
             Assert.IsNotNull(runner.Battle, "бой не стартовал");
             Assert.AreEqual(BattleRunner.Stage.Battle, runner.State);
-            float t0 = Time.realtimeSinceStartup; int frames = 0;
-            while (Time.realtimeSinceStartup - t0 < 6f) { frames++; yield return null; }
+            float t0 = Time.realtimeSinceStartup; int frames = 0; bool shot = false;
+            while (Time.realtimeSinceStartup - t0 < 6f)
+            {
+                frames++; yield return null;
+                // SHOT=1 (без -nographics): снимок камеры в CI/smoke.png — визуальный смоук 3D-поля
+                if (!shot && Time.realtimeSinceStartup - t0 > 2.5f && System.Environment.GetEnvironmentVariable("SHOT") == "1" && SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                {
+                    shot = true; var cam = Camera.main; if (cam != null)
+                    {
+                        var rt = new RenderTexture(540, 960, 24); var old = cam.targetTexture; var oldRect = cam.rect; cam.rect = new Rect(0, 0, 1, 1); cam.targetTexture = rt; cam.Render();
+                        RenderTexture.active = rt; var tex = new Texture2D(540, 960, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, 540, 960), 0, 0); tex.Apply(); RenderTexture.active = null;
+                        cam.targetTexture = old; cam.rect = oldRect;
+                        System.IO.File.WriteAllBytes(System.IO.Path.GetFullPath("CI/smoke.png"), tex.EncodeToPNG()); Debug.Log("[SW] smoke shot CI/smoke.png");
+                    }
+                }
+            }
             Assert.Greater(frames, 30, "кадры не идут");
             Assert.IsTrue(runner.Battle == null || runner.Battle.TurnIndex >= 1 || runner.Battle.Ended, "за 6 с не начался ни один ход");
         }
