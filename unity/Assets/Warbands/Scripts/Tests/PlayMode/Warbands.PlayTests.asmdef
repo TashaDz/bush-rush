@@ -1,0 +1,10 @@
+{
+  "name": "Warbands.PlayTests",
+  "rootNamespace": "Warbands.PlayTests",
+  "references": ["Warbands.Sim", "Warbands.Runtime", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "includePlatforms": [],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "autoReferenced": false
+}

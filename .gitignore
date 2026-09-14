@@ -1,0 +1,27 @@
+# Unity — генерируемое
+unity/Library/
+unity/Temp/
+unity/Logs/
+unity/obj/
+unity/UserSettings/
+unity/Builds/
+unity/CI/*.log
+unity/CI/*.xml
+
+# macOS
+.DS_Store
+
+# публичный билд для GitHub Pages — отдельный git внутри
+deploy/
+
+# купленные FX-паки автора (570 МБ) — не в git; кладутся в unity/Assets вручную, build.sh/Forge их подхватывают
+unity/Assets/Epic Toon FX/
+unity/Assets/Epic Toon FX.meta
+unity/Assets/JMO Assets/
+unity/Assets/JMO Assets.meta
+
+# артефакты Performance Testing пакета при прогоне тестов
+unity/Assets/Resources/PerformanceTestRun*
+unity/Assets/Resources.meta
+unity/CI/formations.txt
+unity/CI/*_chain.txt

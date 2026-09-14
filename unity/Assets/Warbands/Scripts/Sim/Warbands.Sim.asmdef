@@ -1,0 +1,7 @@
+{
+  "name": "Warbands.Sim",
+  "rootNamespace": "Warbands.Sim",
+  "references": [],
+  "noEngineReferences": true,
+  "autoReferenced": true
+}

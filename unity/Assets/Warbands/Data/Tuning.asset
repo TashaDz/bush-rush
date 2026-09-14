@@ -1,0 +1,93 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83f00bf59c4344dfc81f848bf7cc1921, type: 3}
+  m_Name: Tuning
+  m_EditorClassIdentifier: Warbands.Runtime::Warbands.TuningAsset
+  config:
+    balanceProfile: 4
+    heroOffGrid: 1
+    rushMode: 1
+    rounds: 30
+    turnTimeSeconds: 5
+    botDelayNormalMin: 0.8
+    botDelayNormalMax: 2.2
+    botDelayStrongMin: 0.6
+    botDelayStrongMax: 1.8
+    shieldUntilRound: 6
+    shieldMinSquads: 0
+    ultsIgnoreShield: 0
+    overkillToHero: 0
+    chipToHero: 0
+    roundDamageRamp: 0
+    shuffleEqualInitiative: 1
+    damageScale: 1
+    minOutputRatio: 0.35
+    outputExponent: 0.8
+    chargePerFullSquad: 50
+    soulsPerFighter: 1
+    ultimateCostPerFighter: 20
+    ultimateCostNecro: 30
+    chargeMax: 1000
+    ultimateCost: 100
+    ultimateUnlockRound: 2
+    soulHarvestMultiplier: 2
+    damageVariance: 0.3
+    missChance: 0.08
+    critChance: 0.1
+    critMultiplier: 1.5
+    routeEnabled: 1
+    routeMaxTargets: 3
+    routeSplit1: 0.85
+    routeSplit2: 0.35
+    routeSplit3: 0.25
+    routeCounter: 0
+    routeCounterRanged: 0
+    routeAssassinTaken: 0.5
+    routeRearNeedsFront: 0
+    routeActionSeconds: 4.6
+    bushField: 1
+    bushClearBudget: 0
+    bushRegrowTurns: 2
+    bushDamageMult: 1.5
+    bushLiftEndSeconds: 1
+    bushObstacles: 5
+    bushBonuses: 5
+    bushBonusMax: 6
+    bushHealBonus: 100
+    bushDoubleFromRound: 5
+    bushBonusRelocateTurns: 2
+    bushClearSeconds: 0.14
+    bushStepSeconds: 0.22
+    skillCooldownRounds: 3
+    linkedShare: 0.3
+    empoweredBonus: 0.25
+    weaverEmpower: 0.4
+    exposedBonus: 0.25
+    plaguedHealPenalty: 0.25
+    shieldWall: 0.15
+    rageMax: 0.25
+    manyBones: 1.25
+    deathlessThreshold: 0.4
+    deathless: 0.15
+    executeThreshold: 0.3
+    executeBonus: 0.2
+    piercing: 0.5
+    supportHunterBonus: 0.15
+    spellEaterFlat: 25
+    devotion: 0.1
+    warRhythm: 0.1
+    cleanCut: 0.1
+    fastAnimations: 0.65
+    squadActionSeconds: 0.8
+    meleeActionSeconds: 4.3
+    heroActionSeconds: 0.8
+    ultimateSeconds: 1.4

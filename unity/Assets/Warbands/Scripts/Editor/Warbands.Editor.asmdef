@@ -1,0 +1,16 @@
+{
+  "name": "Warbands.Editor",
+  "rootNamespace": "Warbands.EditorTools",
+  "references": [
+    "Warbands.Runtime",
+    "Warbands.Sim",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.TextMeshPro",
+    "Unity.TextMeshPro.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

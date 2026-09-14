@@ -1,0 +1,13 @@
+{
+  "name": "Warbands.Runtime",
+  "rootNamespace": "Warbands",
+  "references": [
+    "Warbands.Sim",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
+    "UnityEngine.UI",
+    "Unity.TextMeshPro",
+    "Unity.InputSystem"
+  ],
+  "autoReferenced": true
+}

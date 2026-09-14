@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e413072c1b9764e9193887c14985a099, type: 3}
+  m_Name: RushAssets
+  m_EditorClassIdentifier: Warbands.Runtime::Warbands.RushAssets
+  cube: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  sphere: {fileID: 10200, guid: 0000000000000000e000000000000000, type: 0}
+  capsule: {fileID: 10205, guid: 0000000000000000e000000000000000, type: 0}
+  cylinder: {fileID: 10203, guid: 0000000000000000e000000000000000, type: 0}
+  ground: {fileID: 2100000, guid: f68a568d396354d79964d8c683d32f61, type: 2}
+  sand: {fileID: 2100000, guid: df047c7ddccd44958a589a5845d7a91a, type: 2}
+  grass: {fileID: 2100000, guid: 14bf6468e4af042fdbac930b0278a996, type: 2}
+  bush: {fileID: 2100000, guid: 53b750568e5e848d8ae6b8bf5a0483c0, type: 2}
+  obstacle: {fileID: 2100000, guid: b654e618c26b1438091c83f8c891d7d0, type: 2}
+  blue: {fileID: 2100000, guid: 012abd0919cd541a6a81cb87e766c09a, type: 2}
+  red: {fileID: 2100000, guid: 32420a32712d149688e585591dc187a1, type: 2}
+  heroBlue: {fileID: 2100000, guid: 82850ab3d906247c3a016b943c18de9e, type: 2}
+  heroRed: {fileID: 2100000, guid: 457b7dc708cd44cde98cc0f9413c2a61, type: 2}
+  gold: {fileID: 2100000, guid: 590c36ef9e71d4c1da6d329f8971b7fb, type: 2}
+  mint: {fileID: 2100000, guid: 6f7a1361d2583497794b4bf13d2a61c2, type: 2}
+  dark: {fileID: 2100000, guid: 4676b3f4973ab4a8ebaa6da568775296, type: 2}

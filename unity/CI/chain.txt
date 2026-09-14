@@ -1,0 +1,5 @@
+== tests
+tests: total=6 passed=6 failed=0
+== smoke
+smoke: total=1 passed=1 failed=0
+== autoplay
