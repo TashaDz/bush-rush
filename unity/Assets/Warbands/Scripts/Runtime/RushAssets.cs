@@ -8,5 +8,6 @@ namespace Warbands
     {
         public Mesh cube, sphere, capsule, cylinder;
         public Material ground, sand, grass, bush, obstacle, blue, red, heroBlue, heroRed, gold, mint, dark;
+        public Material grassSoft, decal;   // Particles/Unlit: вершинный цвет (мягкая трава с запечённым светом) и прозрачная декаль (прицел хода)
     }
 }

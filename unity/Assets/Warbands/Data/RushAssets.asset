@@ -28,3 +28,5 @@ MonoBehaviour:
   gold: {fileID: 2100000, guid: 590c36ef9e71d4c1da6d329f8971b7fb, type: 2}
   mint: {fileID: 2100000, guid: 6f7a1361d2583497794b4bf13d2a61c2, type: 2}
   dark: {fileID: 2100000, guid: 4676b3f4973ab4a8ebaa6da568775296, type: 2}
+  grassSoft: {fileID: 2100000, guid: 7e3a21a4a202741daa4a06fcff024fa8, type: 2}
+  decal: {fileID: 2100000, guid: ba126066cf3bb469baa08da28cfc4fdf, type: 2}

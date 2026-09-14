@@ -70,6 +70,7 @@ namespace Warbands.EditorTools
             a.blue = Mat("Blue", new Color(0.25f, 0.45f, 1f)); a.red = Mat("Red", new Color(1f, 0.32f, 0.3f));
             a.heroBlue = Mat("HeroBlue", new Color(0.12f, 0.25f, 0.85f)); a.heroRed = Mat("HeroRed", new Color(0.8f, 0.12f, 0.12f));
             a.gold = Mat("Gold", new Color(1f, 0.85f, 0.24f)); a.mint = Mat("Mint", new Color(0.49f, 1f, 0.56f)); a.dark = Mat("Dark", new Color(0.1f, 0.1f, 0.12f));
+            a.grassSoft = VertexMat("GrassSoft", false); a.decal = VertexMat("Decal", true);
             EditorUtility.SetDirty(a);
             return a;
         }
@@ -83,6 +84,25 @@ namespace Warbands.EditorTools
                 m = new Material(sh); AssetDatabase.CreateAsset(m, path);
             }
             m.SetColor("_BaseColor", c); m.color = c; if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.15f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// Particles/Unlit URP: цвет = вершинный × _BaseColor (свет запекаем в вершины сами); transparent — для декалей с альфой.
+        static Material VertexMat(string name, bool transparent)
+        {
+            string path = Root + "/Data/Mat_" + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null) { var sh = Shader.Find("Universal Render Pipeline/Particles/Unlit"); m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+            m.SetColor("_BaseColor", Color.white); m.color = Color.white; m.SetFloat("_ColorMode", 0f);
+            if (transparent)
+            {
+                m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f); m.SetFloat("_ZWrite", 0f); m.SetFloat("_Cull", 2f);
+                m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                m.SetOverrideTag("RenderType", "Transparent"); m.renderQueue = 3000; m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.EnableKeyword("_ALPHAPREMULTIPLY_ON"); m.DisableKeyword("_ALPHATEST_ON");
+                m.SetShaderPassEnabled("ShadowCaster", false);
+            }
+            else { m.SetFloat("_Surface", 0f); m.SetFloat("_ZWrite", 1f); m.renderQueue = 2000; m.SetOverrideTag("RenderType", "Opaque"); }
             EditorUtility.SetDirty(m);
             return m;
         }

@@ -1,8 +1,6 @@
 == compile
 compile ok
-== smoke
-smoke: total=1 passed=1 failed=0
 == webgl
-webgl stamp 202609141404
+webgl stamp 202609141421
 webgl ok release 11.3 MB → Builds/WebGL
 CHAIN_DONE

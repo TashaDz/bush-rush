@@ -46,10 +46,10 @@ namespace Warbands
         // ---------- объекты ----------
         Transform root, tilesRoot, unitsRoot;
         readonly MeshRenderer[] tiles = new MeshRenderer[BushGrid.Cols * BushGrid.Rows];
-        readonly Transform[] bushes = new Transform[BushGrid.Cols * BushGrid.Rows], obstacles = new Transform[BushGrid.Cols * BushGrid.Rows], bonuses = new Transform[BushGrid.Cols * BushGrid.Rows];
+        readonly Transform[] obstacles = new Transform[BushGrid.Cols * BushGrid.Rows], bonuses = new Transform[BushGrid.Cols * BushGrid.Rows];
         readonly float[] bushScale = new float[BushGrid.Cols * BushGrid.Rows], bushTarget = new float[BushGrid.Cols * BushGrid.Rows];
         readonly bool[] pendingRegrow = new bool[BushGrid.Cols * BushGrid.Rows], reachMask = new bool[BushGrid.Cols * BushGrid.Rows];
-        Mesh hexMesh, grassMesh, boxMesh, sphereMesh, pawnMesh;   // меши свои (процедурные): встроенные примитивы в WebGL-билд не попадают
+        Mesh hexMesh, boxMesh, sphereMesh, pawnMesh;   // меши свои (процедурные): встроенные примитивы в WebGL-билд не попадают
         public const float GrassH = 0.45f;   // толщина травы
         MaterialPropertyBlock mpb;
 
@@ -72,10 +72,10 @@ namespace Warbands
             root = new GameObject("Field").transform; root.SetParent(transform, false);
             Debug.Log($"[SW] field: gfx={SystemInfo.graphicsDeviceType} mats={(assets != null && assets.ground != null && assets.ground.shader != null ? assets.ground.shader.name : "NONE")}");
             mpb = new MaterialPropertyBlock();
-            hexMesh = BuildHexMesh(); grassMesh = BuildHexPrism(GrassH); boxMesh = GreyMeshes.Box(); sphereMesh = GreyMeshes.Sphere(14, 10); pawnMesh = GreyMeshes.Cylinder(10);
+            hexMesh = BuildHexMesh(); boxMesh = GreyMeshes.Box(); sphereMesh = GreyMeshes.Sphere(14, 10); pawnMesh = GreyMeshes.Cylinder(10);
             // земля
             var ground = Prim("Ground", boxMesh, assets.ground, root);
-            ground.localScale = new Vector3(40f, 0.2f, 40f); ground.localPosition = new Vector3(0f, -0.12f, 0f);
+            ground.localScale = new Vector3(60f, 0.2f, 60f); ground.localPosition = new Vector3(0f, -0.12f, 0f); Tint(ground.GetComponent<MeshRenderer>(), new Color(0.4f, 0.66f, 0.36f));   // земля в цвет травы: край ковра не виден
             tilesRoot = new GameObject("Tiles").transform; tilesRoot.SetParent(root, false);
             unitsRoot = new GameObject("Units").transform; unitsRoot.SetParent(root, false);
             for (int y = 0; y < BushGrid.Rows; y++) for (int x = 0; x < BushGrid.Cols; x++)
@@ -83,16 +83,18 @@ namespace Warbands
                 var c = new Cell(x, y); int i = BushGrid.Index(c); var p = CellPos(c);
                 var tile = new GameObject($"Tile_{x}_{y}", typeof(MeshFilter), typeof(MeshRenderer)); tile.transform.SetParent(tilesRoot, false); tile.transform.localPosition = p + Vector3.up * 0.01f;
                 tile.GetComponent<MeshFilter>().sharedMesh = hexMesh; var mr = tile.GetComponent<MeshRenderer>(); mr.sharedMaterial = assets.sand; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; Tint(mr, assets.sand); tiles[i] = mr;
-                // трава сплошная (автор 14.09): шестигранная призма ровно по гексу, соседние смыкаются в единый ковёр толщиной GrassH;
-                // расчищенный гекс — вырез в ковре с вертикальными стенками, как в референсе Castle Raid
-                var b = Prim("Grass", grassMesh, assets.bush, tilesRoot);
-                b.localPosition = p; b.localScale = Vector3.one;
-                bushes[i] = b; bushScale[i] = bushTarget[i] = 1f;
+                bushScale[i] = bushTarget[i] = 1f;   // уровень травы гекса (1 — заросло), из него строится мягкий ковёр (GrassCarpet)
                 var o = Prim("Obstacle", boxMesh, assets.obstacle, tilesRoot); o.localPosition = p + Vector3.up * 0.35f; o.localScale = new Vector3(0.9f, 0.7f, 0.9f); o.gameObject.SetActive(false); obstacles[i] = o;
                 var bn = Prim("Bonus", sphereMesh, assets.gold, tilesRoot); bn.localPosition = p + Vector3.up * 0.4f; bn.localScale = Vector3.one * 0.38f; bn.gameObject.SetActive(false); bonuses[i] = bn;
             }
+            // трава (автор 14.09): мягкий сплошной ковёр с текстурой — сетка высот по уровням гексов, края плавные, свет запечён в вершины
+            carpet = new GrassCarpet(root, assets.grassSoft, bushScale, reachMask);
+            // прицел хода (из Warbands): кольцо на всё поле сужается на ходящий отряд и остаётся под ним
+            reticle = Prim("Reticle", GreyMeshes.Ring(0.78f, 1f, 40), assets.decal, root); reticle.gameObject.SetActive(false);
             PlaceCamera();
         }
+        GrassCarpet carpet; Transform reticle; Ref reticleFor = Ref.None; float reticleT = -1f; bool reticleMine;
+        const float TurnIn = 0.55f, TurnHold = 0.3f;
 
         void Start()
         {
@@ -111,22 +113,6 @@ namespace Warbands
         void Tint(MeshRenderer mr, Material mat) { if (mat == null) return; var c = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : mat.color; Tint(mr, c); }
         void Tint(MeshRenderer mr, Color c) { mr.GetPropertyBlock(mpb); mpb.SetColor("_BaseColor", c); mpb.SetColor("_Color", c); mr.SetPropertyBlock(mpb); }
 
-        /// Шестигранная призма по гексу (pointy-top, ширина 1): верх, стенки; низ не нужен. Радиус точный — соседи смыкаются.
-        static Mesh BuildHexPrism(float h)
-        {
-            float r = HexH / 2f; var v = new List<Vector3>(); var n = new List<Vector3>(); var t = new List<int>();
-            var ring = new Vector3[6]; for (int k = 0; k < 6; k++) { float a = Mathf.PI / 6f + k * Mathf.PI / 3f; ring[k] = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r); }
-            int c0 = v.Count; v.Add(new Vector3(0f, h, 0f)); n.Add(Vector3.up);
-            for (int k = 0; k < 6; k++) { v.Add(ring[k] + Vector3.up * h); n.Add(Vector3.up); }
-            for (int k = 0; k < 6; k++) { t.Add(c0); t.Add(c0 + 1 + (k + 1) % 6); t.Add(c0 + 1 + k); }
-            for (int k = 0; k < 6; k++)
-            {
-                var a = ring[k]; var b = ring[(k + 1) % 6]; var nrm = Vector3.Cross(Vector3.up, b - a).normalized; nrm = -nrm;
-                int i0 = v.Count; v.Add(a); v.Add(b); v.Add(b + Vector3.up * h); v.Add(a + Vector3.up * h); for (int q = 0; q < 4; q++) n.Add(nrm);
-                t.Add(i0); t.Add(i0 + 2); t.Add(i0 + 1); t.Add(i0); t.Add(i0 + 3); t.Add(i0 + 2);
-            }
-            var m = new Mesh(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(t, 0); m.RecalculateBounds(); return m;
-        }
         static Mesh BuildHexMesh()
         {
             // pointy-top, ширина 1: радиус 1/√3, вершины сверху и снизу (по z)
@@ -166,7 +152,7 @@ namespace Warbands
             for (int y = 0; y < BushGrid.Rows; y++) for (int x = 0; x < BushGrid.Cols; x++)
             {
                 var c = new Cell(x, y); int i = BushGrid.Index(c);
-                bool bush = b.Bushes.IsBush(c); bushTarget[i] = bushScale[i] = bush ? 1f : 0f; bushes[i].gameObject.SetActive(bush); bushes[i].localScale = BushScaleVec(i, bushScale[i]);
+                bool bush = b.Bushes.IsBush(c); bushTarget[i] = bushScale[i] = bush ? 1f : 0f;
                 obstacles[i].gameObject.SetActive(b.Bushes.IsObstacle(c)); pendingRegrow[i] = false; reachMask[i] = false;
                 SetBonus(c, b.Bushes.BonusAt(c), !bush);
                 Retint(i);
@@ -177,11 +163,8 @@ namespace Warbands
                 foreach (var q in sd.Squads) views.Add(BuildUnit(q));
                 if (b.Cfg.rushMode && sd.Hero != null) views.Add(BuildUnit(sd.Hero));
             }
-            SetPending(PendingRegrow(b));
+            SetPending(PendingRegrow(b)); carpet.Dirty(); reticleFor = Ref.None; reticle.gameObject.SetActive(false);
         }
-
-        /// Рост/срез травы — по высоте призмы (ковёр не расходится в стороны).
-        static Vector3 BushScaleVec(int i, float k) => new Vector3(1f, Mathf.Max(0.001f, k), 1f);
 
         UnitView BuildUnit(Unit u)
         {
@@ -226,9 +209,6 @@ namespace Warbands
             if (reachMask[i]) c *= 0.8f;
             mpb.SetColor("_BaseColor", c); mpb.SetColor("_Color", c);
             mr.SetPropertyBlock(mpb);
-            var br = bushes[i].GetComponent<MeshRenderer>(); br.GetPropertyBlock(mpb);
-            Color g = new Color(0.36f, 0.68f, 0.36f); if (reachMask[i]) g *= 0.78f;
-            mpb.SetColor("_BaseColor", g); mpb.SetColor("_Color", g); br.SetPropertyBlock(mpb);
         }
 
         List<Cell> PendingRegrow(BattleState b)
@@ -254,11 +234,12 @@ namespace Warbands
             for (int i = 0; i < reachMask.Length; i++) reachMask[i] = false;
             if (cells != null) foreach (var c in cells) if (BushGrid.Inside(c)) reachMask[BushGrid.Index(c)] = true;
             for (int i = 0; i < reachMask.Length; i++) Retint(i);
+            carpet?.Dirty();
         }
 
         /// Игрок стёр куст пальцем: тропа появляется сразу (в симе куст стоит до конца хода).
         public void EraseCell(Cell c) { int i = BushGrid.Index(c); bushTarget[i] = 0f; pendingRegrow[i] = false; var b = runner.Battle; if (b != null) SetBonus(c, b.Bushes.BonusAt(c), true); Retint(i); }
-        void RegrowCell(Cell c) { int i = BushGrid.Index(c); bushTarget[i] = 1f; bushes[i].gameObject.SetActive(true); pendingRegrow[i] = false; SetBonus(c, BonusKind.None, false); Retint(i); }
+        void RegrowCell(Cell c) { int i = BushGrid.Index(c); bushTarget[i] = 1f; pendingRegrow[i] = false; SetBonus(c, BonusKind.None, false); Retint(i); }
 
         // ---------- постановка ----------
         void OnApplied(List<CombatEvent> evs)
@@ -311,13 +292,15 @@ namespace Warbands
             if (Screen.width != lastW || Screen.height != lastH) ApplyViewport();
             float now = Time.unscaledTime, dt = Time.unscaledDeltaTime;
             for (int i = timed.Count - 1; i >= 0; i--) if (timed[i].t <= now) { var a = timed[i].a; timed.RemoveAt(i); a(); }
+            bool grassDirty = false;
             for (int i = 0; i < bushScale.Length; i++)
             {
                 if (Mathf.Abs(bushScale[i] - bushTarget[i]) < 1e-3f) continue;
-                bushScale[i] = Mathf.MoveTowards(bushScale[i], bushTarget[i], dt * 4f);
-                bushes[i].localScale = BushScaleVec(i, Mathf.Max(0.001f, bushScale[i]));
-                if (bushScale[i] <= 0.001f && bushTarget[i] <= 0f) bushes[i].gameObject.SetActive(false);
+                bushScale[i] = Mathf.MoveTowards(bushScale[i], bushTarget[i], dt * 3f); grassDirty = true;
             }
+            if (grassDirty) carpet.Dirty();
+            carpet.Tick();
+            TickReticle(now, dt);
             foreach (var v in views)
             {
                 if (v.Moving)
@@ -332,6 +315,25 @@ namespace Warbands
             }
             foreach (var bn in bonuses) if (bn.gameObject.activeSelf) bn.localRotation = Quaternion.Euler(0f, now * 90f, 0f);
         }
+        /// Прицел «чей ход» (из Warbands, автор 14.09: «неясно, кто ходит»): при смене актора кольцо со всего поля сужается на его гекс за 0.55 с,
+        /// коротко пульсирует и остаётся под отрядом, пока ход не разыгран; золото — свой, красное — вражеский.
+        void TickReticle(float now, float dt)
+        {
+            var b = runner != null ? runner.Battle : null; var actor = b != null && !b.Ended ? b.Actor : null;
+            bool show = actor != null && !actor.IsHero && !runner.Busy && runner.Countdown <= 0f;
+            if (!show) { if (reticle.gameObject.activeSelf) reticle.gameObject.SetActive(false); reticleFor = Ref.None; return; }
+            if (!actor.Ref.Equals(reticleFor)) { reticleFor = actor.Ref; reticleT = 0f; reticleMine = actor.Side == 0; reticle.gameObject.SetActive(true); }
+            var v = View(actor.Ref); if (v == null) return;
+            reticleT += dt; float size, alpha;
+            if (reticleT < TurnIn) { float k = reticleT / TurnIn; float e = 1f - (1f - k) * (1f - k) * (1f - k); size = Mathf.Lerp(9f, 1f, e); alpha = Mathf.Lerp(0.35f, 1f, e); }
+            else if (reticleT < TurnIn + TurnHold) { float k = (reticleT - TurnIn) / TurnHold; size = 1f + 0.1f * Mathf.Sin(k * Mathf.PI); alpha = 1f; }
+            else { size = 1f + 0.03f * Mathf.Sin(now * 4f); alpha = 0.85f; }
+            reticle.position = v.Root.position + Vector3.up * 0.05f; reticle.localScale = new Vector3(size, 1f, size);
+            reticle.localRotation = Quaternion.Euler(0f, (1f - Mathf.Clamp01(reticleT / TurnIn)) * 90f, 0f);
+            var col = reticleMine ? new Color(1f, 0.85f, 0.24f, alpha) : new Color(1f, 0.36f, 0.36f, alpha);
+            Tint(reticle.GetComponent<MeshRenderer>(), col);
+        }
+
         static Vector3 Along(Vector3 from, List<Vector3> pts, float u)
         {
             int n = pts.Count; float s = u * n; int i = Mathf.Min(n - 1, Mathf.FloorToInt(s)); float f = s - i;
@@ -374,6 +376,18 @@ namespace Warbands
             }
             var m = new Mesh(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(t, 0); m.RecalculateBounds(); return m;
         }
+        /// Плоское кольцо в плоскости XZ: внутренний/внешний радиус, нормаль вверх.
+        public static Mesh Ring(float rIn, float rOut, int seg)
+        {
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var t = new List<int>(); var c = new List<Color32>();
+            for (int s2 = 0; s2 <= seg; s2++)
+            {
+                float th = 2f * Mathf.PI * s2 / seg; var d = new Vector3(Mathf.Cos(th), 0f, Mathf.Sin(th));
+                v.Add(d * rIn); n.Add(Vector3.up); c.Add(new Color32(255, 255, 255, 255)); v.Add(d * rOut); n.Add(Vector3.up); c.Add(new Color32(255, 255, 255, 255));
+            }
+            for (int s2 = 0; s2 < seg; s2++) { int a = s2 * 2; t.AddRange(new[] { a, a + 2, a + 1, a + 1, a + 2, a + 3 }); }
+            var m = new Mesh(); m.SetVertices(v); m.SetNormals(n); m.SetColors(c); m.SetTriangles(t, 0); m.RecalculateBounds(); return m;
+        }
         /// Цилиндр диаметра 1 и высоты 1 (центр в середине).
         public static Mesh Cylinder(int seg)
         {
@@ -391,6 +405,125 @@ namespace Warbands
             for (int s2 = 0; s2 <= seg; s2++) { float th = 2f * Mathf.PI * s2 / seg; v.Add(new Vector3(Mathf.Cos(th) * 0.5f, -0.5f, Mathf.Sin(th) * 0.5f)); n.Add(Vector3.down); }
             for (int s2 = 0; s2 < seg; s2++) t.AddRange(new[] { bot, bot + 1 + s2, bot + 1 + s2 + 1 });
             var m = new Mesh(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(t, 0); m.RecalculateBounds(); return m;
+        }
+    }
+
+    /// Мягкий сплошной ковёр травы (автор 14.09): сетка высот над полем с шагом 0.1; высота вершины — плавная смесь уровней ближайшего гекса и его
+    /// соседей (как маска троп в Warbands) плюс шум, так что края троп органичные, а «толщина» видна по склонам. Свет запекается в вершинный цвет
+    /// (Particles/Unlit), текстура — процедурный шум с светлыми кончиками травинок. Затемнение радиуса хода — тоже в вершинах.
+    public sealed class GrassCarpet
+    {
+        const float Step = 0.12f, Margin = 3.2f, FarMargin = 9f, H = Field3D.GrassH;   // поле с запасом (вдаль больше) — за краем кадра ковёр не кончается
+        readonly int nx, nz; readonly float x0, z0;
+        readonly Mesh mesh; readonly Vector3[] verts; readonly Color32[] cols; readonly Vector3[] normals;
+        readonly int[] nearIdx; readonly float[] weights;   // на вершину: ближайший гекс (-1 — вне поля) и 7 весов (сам + 6 соседей)
+        readonly short[] nearX, nearY;
+        readonly float[] noise, tips;
+        readonly float[] level; readonly bool[] reach; bool dirty = true;
+        static readonly Vector3 LightDir = new Vector3(-0.35f, 0.85f, -0.4f).normalized;
+
+        public GrassCarpet(Transform parent, Material mat, float[] level, bool[] reach)
+        {
+            this.level = level; this.reach = reach;
+            float w = BushGrid.Cols + 0.5f, d = (BushGrid.Rows - 1) * Field3D.Pitch + Field3D.HexH;
+            x0 = -w / 2f - Margin; z0 = -d / 2f - Margin; nx = Mathf.CeilToInt((w + 2f * Margin) / Step) + 1; nz = Mathf.CeilToInt((d + Margin + FarMargin) / Step) + 1;
+            int n = nx * nz; verts = new Vector3[n]; cols = new Color32[n]; normals = new Vector3[n]; nearIdx = new int[n]; nearX = new short[n]; nearY = new short[n]; weights = new float[n * 7]; noise = new float[n]; tips = new float[n];
+            var uv = new Vector2[n]; var tri = new int[(nx - 1) * (nz - 1) * 6];
+            for (int j = 0; j < nz; j++) for (int i = 0; i < nx; i++)
+            {
+                int k = j * nx + i; float x = x0 + i * Step, z = z0 + j * Step; verts[k] = new Vector3(x, 0f, z); uv[k] = new Vector2(x * 0.7f, z * 0.7f);
+                var near = Field3D.CellAt(new Vector3(x, 0f, z)); Cell c = near ?? NearestAny(x, z);
+                nearX[k] = (short)c.X; nearY[k] = (short)c.Y; nearIdx[k] = BushGrid.Inside(c) ? BushGrid.Index(c) : -1;
+                float sum = 0f; var wk = new float[7];
+                for (int q = 0; q < 7; q++)
+                {
+                    int cx = c.X, cy = c.Y; if (q > 0) { BushGrid.NeighborDelta(c.Y, q - 1, out int dx, out int dy); cx += dx; cy += dy; }
+                    var p = Field3D.CellPos(new Cell(cx, cy)); float dist = Mathf.Sqrt((p.x - x) * (p.x - x) + (p.z - z) * (p.z - z));
+                    float t = Mathf.Max(0f, 1f - dist / 0.95f); wk[q] = t * t; sum += wk[q];
+                }
+                for (int q = 0; q < 7; q++) weights[k * 7 + q] = wk[q] / Mathf.Max(sum, 1e-4f);
+                noise[k] = Noise(x * 1.7f, z * 1.7f) * 0.6f + Noise(x * 5.1f, z * 5.1f) * 0.4f;
+                tips[k] = Hash(i * 7 + 3, j * 13 + 1);
+            }
+            int t2 = 0;
+            for (int j = 0; j < nz - 1; j++) for (int i = 0; i < nx - 1; i++)
+            {
+                int a = j * nx + i, b = a + 1, cc = a + nx, dd = cc + 1;
+                tri[t2++] = a; tri[t2++] = cc; tri[t2++] = b; tri[t2++] = b; tri[t2++] = cc; tri[t2++] = dd;
+            }
+            mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; mesh.vertices = verts; mesh.uv = uv; mesh.triangles = tri; mesh.colors32 = cols;
+            var go = new GameObject("GrassCarpet", typeof(MeshFilter), typeof(MeshRenderer)); go.transform.SetParent(parent, false);
+            go.GetComponent<MeshFilter>().sharedMesh = mesh; var mr = go.GetComponent<MeshRenderer>(); mr.sharedMaterial = mat; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var mpb = new MaterialPropertyBlock(); mpb.SetTexture("_BaseMap", BuildTexture()); mpb.SetVector("_BaseMap_ST", new Vector4(1f, 1f, 0f, 0f)); mpb.SetColor("_BaseColor", Color.white); mr.SetPropertyBlock(mpb);
+            Rebuild();
+        }
+        static Cell NearestAny(float x, float z)
+        {
+            Cell best = default; float bd = float.MaxValue;
+            for (int y = 0; y < BushGrid.Rows; y++) for (int cx = 0; cx < BushGrid.Cols; cx++) { var p = Field3D.CellPos(new Cell(cx, y)); float d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z); if (d < bd) { bd = d; best = new Cell(cx, y); } }
+            return best;
+        }
+        static float Hash(int x, int y) { unchecked { uint h = (uint)(x * 374761393) ^ (uint)(y * 668265263); h = (h ^ (h >> 13)) * 1274126177u; return ((h ^ (h >> 16)) & 0xFFFF) / 65535f; } }
+        /// Value-noise, диапазон [-1, 1].
+        static float Noise(float x, float y)
+        {
+            int ix = Mathf.FloorToInt(x), iy = Mathf.FloorToInt(y); float fx = x - ix, fy = y - iy; fx = fx * fx * (3f - 2f * fx); fy = fy * fy * (3f - 2f * fy);
+            float a = Hash(ix, iy), b = Hash(ix + 1, iy), c = Hash(ix, iy + 1), d = Hash(ix + 1, iy + 1);
+            return (Mathf.Lerp(Mathf.Lerp(a, b, fx), Mathf.Lerp(c, d, fx), fy) - 0.5f) * 2f;
+        }
+        /// Текстура травы 256²: шум + светлые кончики травинок; повторяется по миру (UV = xz × 0.7).
+        static Texture2D BuildTexture()
+        {
+            const int N = 256; var tex = new Texture2D(N, N, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };
+            var px = new Color32[N * N];
+            for (int y = 0; y < N; y++) for (int x = 0; x < N; x++)
+            {
+                float u = x / (float)N * 8f, v = y / (float)N * 8f;
+                float n = Noise(u, v) * 0.5f + Noise(u * 3.1f, v * 3.1f) * 0.3f + Noise(u * 9.7f, v * 9.7f) * 0.2f;   // масштабы кратны периоду — шов не виден
+                float k = Mathf.Clamp01(0.9f + n * 0.18f);
+                bool tip = Hash(x, y) > 0.965f;
+                px[y * N + x] = tip ? new Color32(190, 245, 170, 255) : new Color32((byte)(255 * k), (byte)(255 * Mathf.Clamp01(k + 0.03f)), (byte)(255 * k * 0.92f), 255);
+            }
+            tex.SetPixels32(px); tex.Apply(true, false); return tex;
+        }
+
+        public void Dirty() => dirty = true;
+        public void Tick() { if (dirty) { Rebuild(); dirty = false; } }
+
+        void Rebuild()
+        {
+            int n = verts.Length;
+            for (int k = 0; k < n; k++)
+            {
+                // смесь уровней: вне поля — трава (1)
+                float m = 0f; int bx = nearX[k], by = nearY[k];
+                for (int q = 0; q < 7; q++)
+                {
+                    float w = weights[k * 7 + q]; if (w <= 0f) continue;
+                    int cx = bx, cy = by; if (q > 0) { BushGrid.NeighborDelta(by, q - 1, out int dx, out int dy); cx += dx; cy += dy; }
+                    bool inside = cx >= 0 && cx < BushGrid.Cols && cy >= 0 && cy < BushGrid.Rows;
+                    m += w * (inside ? level[cy * BushGrid.Cols + cx] : 1f);
+                }
+                float edge = Mathf.Clamp01((m + noise[k] * 0.12f - 0.35f) / 0.3f); edge = edge * edge * (3f - 2f * edge);   // мягкий склон у края тропы
+                float h = H * edge * (1f + noise[k] * 0.12f);
+                verts[k].y = h;
+            }
+            // нормали по разностям высот, свет и цвет — в вершины
+            for (int j = 0; j < nz; j++) for (int i = 0; i < nx; i++)
+            {
+                int k = j * nx + i;
+                float hl = verts[j * nx + Mathf.Max(0, i - 1)].y, hr = verts[j * nx + Mathf.Min(nx - 1, i + 1)].y, hd = verts[Mathf.Max(0, j - 1) * nx + i].y, hu = verts[Mathf.Min(nz - 1, j + 1) * nx + i].y;
+                var nrm = new Vector3(hl - hr, 2f * Step, hd - hu).normalized; normals[k] = nrm;
+                float light = 0.8f + 0.2f * Mathf.Clamp01(Vector3.Dot(nrm, LightDir));
+                float hk = verts[k].y / H; float depth = 0.32f + 0.68f * Mathf.Clamp01(hk * hk * 1.3f);   // верх светлый, склон и низ заметно темнее — «срез» травы читается
+                float g = 1f + noise[k] * 0.08f;
+                float r = 0.44f * g, gg = 0.8f * g, b = 0.4f * g;
+                if (tips[k] > 0.93f && hk > 0.6f) { r += 0.12f; gg += 0.14f; b += 0.08f; }
+                int ni = nearIdx[k]; if (ni >= 0 && reach[ni]) { r *= 0.72f; gg *= 0.72f; b *= 0.72f; }
+                float f = light * depth;
+                cols[k] = new Color32((byte)(255 * Mathf.Clamp01(r * f)), (byte)(255 * Mathf.Clamp01(gg * f)), (byte)(255 * Mathf.Clamp01(b * f)), 255);
+            }
+            mesh.vertices = verts; mesh.normals = normals; mesh.colors32 = cols; mesh.RecalculateBounds();
         }
     }
 }
