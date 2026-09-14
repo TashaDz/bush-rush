@@ -122,9 +122,9 @@ namespace Warbands
         void PlaceCamera()
         {
             if (cam == null) return;
-            cam.orthographic = false; cam.fieldOfView = 46f; cam.nearClipPlane = 0.3f; cam.farClipPlane = 60f;
-            cam.transform.position = new Vector3(0f, 11.2f, -8.6f);
-            cam.transform.LookAt(new Vector3(0f, 0f, 0.2f));
+            cam.orthographic = false; cam.nearClipPlane = 0.3f; cam.farClipPlane = 60f;
+            cam.transform.position = new Vector3(0f, 12.4f, -8.4f);
+            cam.transform.LookAt(new Vector3(0f, 0f, 1.15f));   // выше середины: своё поле уходит из-под нижних полосок HUD, герой врага — под верхней
             ApplyViewport();
         }
         int lastW, lastH;
@@ -134,6 +134,9 @@ namespace Warbands
             float w = Screen.width, h = Screen.height; if (w < 1f || h < 1f) return;
             float aspect = 1080f / 1920f; float colW = h * aspect;
             cam.rect = w > colW ? new Rect((w - colW) / 2f / w, 0f, colW / w, 1f) : new Rect(0f, 0f, 1f, 1f);   // колонка 9:16 по центру, как PortraitFrame
+            // горизонтальный угол обзора постоянный (поле 6.5 гексов влезает по ширине), вертикальный — от аспекта колонки
+            float colAspect = Mathf.Min(w, colW) / h; const float HFov = 28f;
+            cam.fieldOfView = 2f * Mathf.Atan(Mathf.Tan(HFov * 0.5f * Mathf.Deg2Rad) / colAspect) * Mathf.Rad2Deg;
             lastW = Screen.width; lastH = Screen.height;
         }
 
