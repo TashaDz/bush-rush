@@ -3,6 +3,6 @@ compile ok
 == smoke
 smoke: total=1 passed=1 failed=0
 == webgl
-webgl stamp 202609141345
+webgl stamp 202609141353
 webgl ok release 11.3 MB → Builds/WebGL
 CHAIN_DONE

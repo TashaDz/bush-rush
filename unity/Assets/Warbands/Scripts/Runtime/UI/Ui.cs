@@ -195,7 +195,7 @@ namespace Warbands.UI
             var b = MakeButton(parent, name, 18, Theme.GoldLight, Theme.Gold, 4, label, size, Theme.TextOnGold, onClick);
             var bevel = Image(b.Rt, "Bevel", UiSprites.RoundedFill(18), Theme.Bevel); bevel.transform.SetAsFirstSibling();
             Stretch(bevel.rectTransform, 0, 8, 0, -8);   // бевель 8 вниз
-            b.Fill.transform.SetSiblingIndex(0);
+            // (14.09) раньше здесь кнопка переставлялась в начало детей родителя — уходила под скрим/ловец пальца и не ловила клики; бевель уже первый внутри кнопки
             return b;
         }
 
