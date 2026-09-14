@@ -71,8 +71,18 @@ namespace Warbands.EditorTools
             a.heroBlue = Mat("HeroBlue", new Color(0.12f, 0.25f, 0.85f)); a.heroRed = Mat("HeroRed", new Color(0.8f, 0.12f, 0.12f));
             a.gold = Mat("Gold", new Color(1f, 0.85f, 0.24f)); a.mint = Mat("Mint", new Color(0.49f, 1f, 0.56f)); a.dark = Mat("Dark", new Color(0.1f, 0.1f, 0.12f));
             a.grassSoft = VertexMat("GrassSoft", false); a.decal = VertexMat("Decal", true);
+            a.iconSword = Icon("sword"); a.iconBow = Icon("bow"); a.iconWand = Icon("magic-wand"); a.iconHeal = Icon("healing");
             EditorUtility.SetDirty(a);
             return a;
+        }
+        /// Значок класса (белый силуэт с чёрным контуром из Warbands): импорт как обычная текстура с альфой.
+        static Texture2D Icon(string name)
+        {
+            string path = Root + "/Icons/" + name + ".png";
+            var imp = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (imp != null && (imp.textureType != TextureImporterType.Default || !imp.alphaIsTransparency || imp.mipmapEnabled))
+            { imp.textureType = TextureImporterType.Default; imp.alphaIsTransparency = true; imp.mipmapEnabled = false; imp.maxTextureSize = 256; imp.SaveAndReimport(); }
+            var t = AssetDatabase.LoadAssetAtPath<Texture2D>(path); if (t == null) Debug.LogWarning("[SW] no icon " + path); return t;
         }
         static Material Mat(string name, Color c)
         {

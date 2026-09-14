@@ -62,6 +62,11 @@ namespace Warbands
             public Vector3 HeadPos => Centroid + Vector3.up * (Unit != null && Unit.IsHero ? 1.5f : 0.6f);
         }
         public sealed class FigJob { public Transform Fig; public Vector3 From; public List<Vector3> Path; public float Start, End; }
+        public sealed class Lunge { public Transform Fig; public Vector3 From, To; public float Start; }   // выпад к врагу и назад (0.44 с)
+        readonly List<Lunge> lunges = new List<Lunge>();
+        readonly List<(Transform t, float born)> splats = new List<(Transform, float)>();   // кляксы на земле, тают за 8 с
+        Mesh quadMesh; Texture2D splatTex;
+        readonly Dictionary<Transform, Transform> icons = new Dictionary<Transform, Transform>();   // значок класса над бойцом
         readonly List<UnitView> views = new List<UnitView>();
         public IReadOnlyList<UnitView> Views => views;
         public UnitView View(Ref r) { foreach (var v in views) if (v.Unit != null && v.Unit.Ref == r) return v; return null; }
@@ -74,7 +79,7 @@ namespace Warbands
             root = new GameObject("Field").transform; root.SetParent(transform, false);
             Debug.Log($"[SW] field: gfx={SystemInfo.graphicsDeviceType} mats={(assets != null && assets.ground != null && assets.ground.shader != null ? assets.ground.shader.name : "NONE")}");
             mpb = new MaterialPropertyBlock();
-            hexMesh = BuildHexMesh(); boxMesh = GreyMeshes.Box(); sphereMesh = GreyMeshes.Sphere(14, 10); pawnMesh = GreyMeshes.Cylinder(10);
+            hexMesh = BuildHexMesh(); boxMesh = GreyMeshes.Box(); quadMesh = GreyMeshes.Quad(); splatTex = BuildSplatTexture(); sphereMesh = GreyMeshes.Sphere(14, 10); pawnMesh = GreyMeshes.Cylinder(10);
             // земля
             var ground = Prim("Ground", boxMesh, assets.ground, root);
             ground.localScale = new Vector3(60f, 0.2f, 60f); ground.localPosition = new Vector3(0f, -0.12f, 0f); Tint(ground.GetComponent<MeshRenderer>(), new Color(0.4f, 0.66f, 0.36f));   // земля в цвет травы: край ковра не виден
@@ -159,7 +164,7 @@ namespace Warbands
                 SetBonus(c, b.Bushes.BonusAt(c), !bush);
                 Retint(i);
             }
-            foreach (var v in views) Destroy(v.Root.gameObject); views.Clear();
+            foreach (var v in views) Destroy(v.Root.gameObject); views.Clear(); foreach (var kv in icons) Destroy(kv.Value.gameObject); icons.Clear(); foreach (var sp in splats) Destroy(sp.t.gameObject); splats.Clear(); lunges.Clear();
             foreach (var sd in b.Sides)
             {
                 foreach (var q in sd.Squads) views.Add(BuildUnit(q));
@@ -186,6 +191,7 @@ namespace Warbands
             {
                 var f = Prim("F", u.IsHero ? boxMesh : pawnMesh, u.IsHero ? (u.Side == 0 ? assets.heroBlue : assets.heroRed) : (u.Side == 0 ? assets.blue : assets.red), v.Root);
                 f.localScale = u.IsHero ? new Vector3(0.7f, 1.2f, 0.7f) : new Vector3(0.16f, 0.3f, 0.16f);
+                if (!u.IsHero) MakeIcon(f, u);
                 v.Figs.Add(f);
             }
             var sum = Vector3.zero; int on = 0;
@@ -199,6 +205,49 @@ namespace Warbands
             v.Centroid = on > 0 ? sum / on : CellPos(u.Cell);
         }
 
+        /// Значок класса над бойцом (автор 14.09, значки из Warbands): меч — ближники, лук — стрелки, посох — магия/усиление, сердце — лекари.
+        void MakeIcon(Transform fig, Unit u)
+        {
+            var d = u.Squad; Texture2D tex; Color col;
+            if (d.Support == SupportKind.Heal || d.Support == SupportKind.Restore) { tex = assets.iconHeal; col = new Color(0.55f, 1f, 0.62f); }
+            else if (d.Reach != Reach.Ranged) { tex = assets.iconSword; col = new Color(1f, 0.9f, 0.55f); }
+            else if (d.DamageType == DamageType.Magic || d.IsSupport) { tex = assets.iconWand; col = new Color(0.8f, 0.7f, 1f); }
+            else { tex = assets.iconBow; col = new Color(1f, 0.78f, 0.5f); }
+            if (tex == null) return;
+            var q = Prim("Icon", quadMesh, assets.decal, root); q.localScale = new Vector3(0.24f, 0.24f, 1f);
+            var mr = q.GetComponent<MeshRenderer>(); mr.GetPropertyBlock(mpb); mpb.SetTexture("_BaseMap", tex); mpb.SetColor("_BaseColor", col); mpb.SetColor("_Color", col); mr.SetPropertyBlock(mpb);
+            icons[fig] = q;
+        }
+        void TickIcons()
+        {
+            if (cam == null) return; var rot = cam.transform.rotation;
+            foreach (var kv in icons)
+            {
+                var fig = kv.Key; var q = kv.Value; bool on = fig.gameObject.activeInHierarchy;
+                if (q.gameObject.activeSelf != on) q.gameObject.SetActive(on); if (!on) continue;
+                q.position = fig.position + Vector3.up * 0.34f; q.rotation = rot;
+            }
+        }
+        /// Клякса на земле в месте гибели бойца: цвет стороны, случайный поворот, тает.
+        void Splat(Vector3 at, int side)
+        {
+            var q = Prim("Splat", quadMesh, assets.decal, root); float sc = 0.35f + Hash(splats.Count, (int)(at.x * 10f)) * 0.3f;
+            q.position = new Vector3(at.x, 0.03f, at.z); q.rotation = Quaternion.Euler(90f, Hash((int)(at.z * 10f), splats.Count) * 360f, 0f); q.localScale = new Vector3(sc, sc, 1f);
+            var mr = q.GetComponent<MeshRenderer>(); mr.GetPropertyBlock(mpb); mpb.SetTexture("_BaseMap", splatTex);
+            var col = side == 0 ? new Color(0.2f, 0.4f, 1f, 0.85f) : new Color(0.95f, 0.15f, 0.2f, 0.85f); mpb.SetColor("_BaseColor", col); mpb.SetColor("_Color", col); mr.SetPropertyBlock(mpb);
+            splats.Add((q, Time.unscaledTime));
+        }
+        static Texture2D BuildSplatTexture()
+        {
+            const int N = 64; var tex = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp }; var px = new Color32[N * N];
+            for (int y = 0; y < N; y++) for (int x = 0; x < N; x++)
+            {
+                float u = (x + 0.5f) / N - 0.5f, v = (y + 0.5f) / N - 0.5f; float r = Mathf.Sqrt(u * u + v * v) * 2f; float a = Mathf.Atan2(v, u);
+                float edge = 0.55f + 0.25f * Mathf.Sin(a * 5f + 1.3f) + 0.15f * Mathf.Sin(a * 9f);   // рваный край
+                float k = Mathf.Clamp01((edge - r) / 0.12f); px[y * N + x] = new Color32(255, 255, 255, (byte)(255 * k));
+            }
+            tex.SetPixels32(px); tex.Apply(false, false); return tex;
+        }
         void SetBonus(Cell c, BonusKind k, bool visible)
         {
             int i = BushGrid.Index(c); var t = bonuses[i]; bool show = k != BonusKind.None && visible;
@@ -287,8 +336,19 @@ namespace Warbands
                     case EventType.BonusTaken: { var cells = BushGrid.Decode(e.Text); timed.Add((moveEnd, () => { foreach (var c in cells) SetBonus(c, BonusKind.None, false); })); break; }
                     case EventType.DamageApplied: case EventType.HealApplied:
                         {
-                            var tv = View(e.Target); var src = View(e.Actor); float at = moveEnd + 0.35f * k;
-                            timed.Add((at, () => { if (tv != null && tv.Unit != null) { tv.ShownHp = tv.Unit.Hp; tv.Punch = 1f; LayoutFigs(tv); } if (src != null) src.Punch = 0.6f; Hit?.Invoke(e); }));
+                            var tv = View(e.Target); var src = View(e.Actor); float at = moveEnd + 0.35f * k; bool heal = e.Type == EventType.HealApplied;
+                            timed.Add((at - 0.22f * k, () => { if (!heal && src != null && tv != null) LungeAt(src, tv); }));   // выпад к врагу
+                            timed.Add((at, () =>
+                            {
+                                if (tv != null && tv.Unit != null)
+                                {
+                                    var before = new List<Vector3>(); foreach (var f in tv.Figs) if (f.gameObject.activeSelf) before.Add(f.position);
+                                    tv.ShownHp = tv.Unit.Hp; tv.Punch = 1f; LayoutFigs(tv);
+                                    int after = 0; foreach (var f in tv.Figs) if (f.gameObject.activeSelf) after++;
+                                    if (!heal && !tv.Unit.IsHero) for (int i = after; i < before.Count; i++) Splat(before[i], tv.Unit.Side);   // павшие — кляксы
+                                }
+                                if (src != null) src.Punch = 0.6f; Hit?.Invoke(e);
+                            }));
                             t = Mathf.Max(t, at + 0.5f * k);
                             break;
                         }
@@ -299,6 +359,19 @@ namespace Warbands
                 }
             }
             timed.Add((t + 0.05f, () => { var bb = runner.Battle; if (bb != null) { SetPending(PendingRegrow(bb)); foreach (var v in views) if (v.Unit != null && v.Unit.Alive) v.ShownHp = v.Unit.Hp; } }));
+        }
+        /// Выпад: каждый боец атакующего, у кого рядом (≤ 1.2) есть боец цели, дёргается к ближайшему и обратно; толпы смешиваются.
+        void LungeAt(UnitView src, UnitView tv)
+        {
+            var targets = new List<Vector3>(); foreach (var f in tv.Figs) if (f.gameObject.activeSelf) targets.Add(f.position);
+            if (targets.Count == 0) return;
+            foreach (var f in src.Figs)
+            {
+                if (!f.gameObject.activeSelf) continue; Vector3 best = targets[0]; float bd = float.MaxValue;
+                foreach (var p in targets) { float d = (p - f.position).sqrMagnitude; if (d < bd) { bd = d; best = p; } }
+                if (bd > 1.44f) continue;
+                lunges.Add(new Lunge { Fig = f, From = f.position, To = Vector3.Lerp(f.position, best, 0.6f), Start = Time.unscaledTime });
+            }
         }
         /// Попадание/лечение показано (для всплывающих чисел в HUD).
         public event System.Action<CombatEvent> Hit;
@@ -336,6 +409,18 @@ namespace Warbands
                 else if (v.Root.localScale != Vector3.one) v.Root.localScale = Vector3.one;
             }
             foreach (var bn in bonuses) if (bn.gameObject.activeSelf) bn.localRotation = Quaternion.Euler(0f, now * 90f, 0f);
+            for (int i = lunges.Count - 1; i >= 0; i--)
+            {
+                var l = lunges[i]; float u = (now - l.Start) / 0.44f;
+                if (u >= 1f) { l.Fig.position = l.From; lunges.RemoveAt(i); continue; }
+                float k2 = Mathf.Sin(u * Mathf.PI); l.Fig.position = Vector3.Lerp(l.From, l.To, k2) + Vector3.up * 0.06f * k2;
+            }
+            for (int i = splats.Count - 1; i >= 0; i--)
+            {
+                float age = now - splats[i].born; if (age > 8f) { Destroy(splats[i].t.gameObject); splats.RemoveAt(i); continue; }
+                if (age > 5f) { var mr = splats[i].t.GetComponent<MeshRenderer>(); mr.GetPropertyBlock(mpb); var c = mpb.GetColor("_BaseColor"); c.a = 0.85f * (1f - (age - 5f) / 3f); mpb.SetColor("_BaseColor", c); mpb.SetColor("_Color", c); mr.SetPropertyBlock(mpb); }
+            }
+            TickIcons();
         }
         /// Прицел «чей ход» (из Warbands, автор 14.09: «неясно, кто ходит»): при смене актора кольцо со всего поля сужается на его гекс за 0.55 с,
         /// коротко пульсирует и остаётся под отрядом, пока ход не разыгран; золото — свой, красное — вражеский.
@@ -398,6 +483,16 @@ namespace Warbands
                 t.AddRange(new[] { a, a + 1, b, a + 1, b + 1, b });
             }
             var m = new Mesh(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(t, 0); m.RecalculateBounds(); return m;
+        }
+        /// Квадрат 1×1 в плоскости XY (для билбордов и декалей), с UV.
+        public static Mesh Quad()
+        {
+            var m = new Mesh();
+            m.vertices = new[] { new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f), new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f) };
+            m.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) };
+            m.normals = new[] { Vector3.back, Vector3.back, Vector3.back, Vector3.back };
+            m.colors32 = new[] { new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255) };
+            m.triangles = new[] { 0, 2, 1, 0, 3, 2 }; m.RecalculateBounds(); return m;
         }
         /// Плоское кольцо в плоскости XZ: внутренний/внешний радиус, нормаль вверх.
         public static Mesh Ring(float rIn, float rOut, int seg)

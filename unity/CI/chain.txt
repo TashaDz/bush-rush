@@ -1,43 +1,12 @@
 == compile
 compile ok
+== forge
+forge ok
 == tests
 tests: total=6 passed=6 failed=0
 == smoke
 smoke: total=1 passed=1 failed=0
-== autoplay
-win rate of ROW preset vs COLUMN preset (A side), 20 seeds per pair, bot Normal
-              Grave   Sustai  Rage L  Execut  Magic   Lastin  Bone T  Plague  Radian  Storm   Thunde  Arcane  
-Grave Cycle    45%      0%     15%      5%      5%      5%      5%     25%     10%      0%     15%     10%    
-Sustained Fire100%     40%     90%     60%     95%     90%     85%     90%    100%     80%    100%     90%    
-Rage Link      85%      0%     40%     15%     25%     45%     65%     70%     85%     40%     55%     30%    
-Execution Chain 90%     35%     85%     50%     75%     90%     80%     70%     85%     35%     95%     90%    
-Magic Eaters   85%     15%     55%     25%     50%     80%     70%     65%     85%     40%     90%     50%    
-Lasting Light  90%     10%     30%     20%     35%     45%     40%     75%     55%     30%     50%     40%    
-Bone Tide     100%     20%     60%     10%     35%     65%     60%     65%     45%     40%     35%     65%    
-Plague March   50%      5%     50%     10%     35%     50%     35%     65%     40%     20%     65%     25%    
-Radiant Line   65%      0%     15%     10%     10%     15%     10%     45%     55%      0%     45%      0%    
-Storm Wall     95%     30%     80%     40%     55%     65%     65%     95%     85%     60%    100%     70%    
-Thunder Volley 70%      0%      5%      5%      5%     25%     20%     20%     55%      0%     45%     10%    
-Arcane Siege   85%     20%     55%     40%     60%     75%     30%     90%     95%     35%     95%     65%    
-
-preset          games  win%  ults med/q3/max  limitWins  shieldNeverRemovedWins
-Grave Cycle       480   16%    2/2/3            0      0
-Sustained Fire    480   85%    1/1/2            0      0
-Rage Link         480   49%    1/1/1            0      0
-Execution Chain   480   75%    1/1/1            0      0
-Magic Eaters      480   59%    1/1/1            0      0
-Lasting Light     480   45%    1/1/2            0      0
-Bone Tide         480   51%    2/3/8            0      0
-Plague March      480   36%    2/2/2            1      1
-Radiant Line      480   28%    1/1/2            0      0
-Storm Wall        480   69%    1/1/1            0      0
-Thunder Volley    480   28%    1/1/1            0      0
-Arcane Siege      480   58%    1/1/1            0      0
-
-round-limit endings: 0%  median final round: 6  avg actions/battle: 28.9
-
-autoplay ok 142.6s
 == webgl
-webgl stamp 202609141449
+webgl stamp 202609141501
 webgl ok release 11.3 MB → Builds/WebGL
 CHAIN_DONE

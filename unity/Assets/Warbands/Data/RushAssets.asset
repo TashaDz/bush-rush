@@ -30,3 +30,7 @@ MonoBehaviour:
   dark: {fileID: 2100000, guid: 4676b3f4973ab4a8ebaa6da568775296, type: 2}
   grassSoft: {fileID: 2100000, guid: 7e3a21a4a202741daa4a06fcff024fa8, type: 2}
   decal: {fileID: 2100000, guid: ba126066cf3bb469baa08da28cfc4fdf, type: 2}
+  iconSword: {fileID: 2800000, guid: 6be1f1a65c64d4a359176eaa273e610e, type: 3}
+  iconBow: {fileID: 2800000, guid: 721240c80c082431abe34a255bbb6121, type: 3}
+  iconWand: {fileID: 2800000, guid: 27d6f7bc5d8e94400bd7935d1f1be85c, type: 3}
+  iconHeal: {fileID: 2800000, guid: 0f3793606834747658aedbccbaeecaf4, type: 3}

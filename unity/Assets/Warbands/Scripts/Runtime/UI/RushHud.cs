@@ -105,9 +105,11 @@ namespace Warbands.UI
         }
         int Shown(Unit u) { var v = field?.View(u.Ref); return v != null ? v.ShownHp : u.Hp; }
 
+        const bool ShowSquadChips = false;   // автор 14.09: HP-бары бойцов/отрядов не показываем (у каждого бойца своё HP в симе)
         void TickChips(BattleState b, float dt)
         {
             if (field == null) return;
+            if (!ShowSquadChips) { foreach (var kv in chipMap) if (kv.Value.rt.gameObject.activeSelf) kv.Value.rt.gameObject.SetActive(false); TickFloats(dt); return; }
             var seen = new HashSet<Ref>();
             foreach (var v in field.Views)
             {
@@ -129,6 +131,10 @@ namespace Warbands.UI
                 chip.fill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(k), 1f); chip.txt.text = $"{v.ShownHp}";
             }
             foreach (var kv in chipMap) if (!seen.Contains(kv.Key) && kv.Value.rt.gameObject.activeSelf) kv.Value.rt.gameObject.SetActive(false);
+            TickFloats(dt);
+        }
+        void TickFloats(float dt)
+        {
             for (int i = floats.Count - 1; i >= 0; i--)
             {
                 var f = floats[i]; f.life -= dt; if (f.life <= 0f) { f.t.gameObject.SetActive(false); floats.RemoveAt(i); continue; }

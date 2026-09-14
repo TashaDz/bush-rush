@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using Warbands.Sim;
 
@@ -25,7 +26,8 @@ namespace Warbands.Tests
             }
             Assert.AreSame(s.Sides[1].Hero, BushLogic.OccupantAt(s, s.Sides[1].Hero.Cell), "герой занимает гекс");
             Assert.IsFalse(BushLogic.Passable(s, s.Sides[0].Hero.Cell, 0), "свой герой — стена");
-            Assert.IsFalse(BushLogic.Passable(s, s.Sides[1].Squads[0].Cell, 0), "гекс с вражескими бойцами — стена");
+            Assert.IsTrue(BushLogic.Passable(s, s.Sides[1].Squads[0].Cell, 0), "гекс с вражескими бойцами проходим — дерёмся вперемешку");
+            foreach (var sd in s.Sides) foreach (var q in sd.Squads) { int sum = 0; foreach (var h in q.FighterHp) sum += h; Assert.AreEqual(q.Hp, sum, "HP бойцов в сумме = HP отряда: " + q.Name); foreach (var h in q.FighterHp) Assert.LessOrEqual(h, q.Squad.HpPerFighter); }
             foreach (var p in Presets.All) { foreach (var id in p.Front) Assert.IsTrue(Cards.Available(id)); foreach (var id in p.Back) Assert.IsTrue(Cards.Available(id), "лекарей в колодах нет: " + id); }
         }
 
@@ -61,7 +63,8 @@ namespace Warbands.Tests
             var evs = BattleResolver.Apply(s, Command.Clear(w.Ref, null));
             Assert.IsTrue(evs.Exists(e => e.Type == EventType.DamageApplied && e.Actor == w.Ref && e.Target == enemy.Ref), "встретили врага по дороге — ударили");
             Assert.Less(enemy.Hp, hp0); Assert.AreEqual(enemy.Count, enemy.Fighters.Count, "павшие бойцы сняты");
-            foreach (var f in w.Fighters) Assert.IsNull(FlowLogic.EnemyAt(s, f, 0), "на гексах врага не стоим");
+            int sum2 = 0; foreach (var h in enemy.FighterHp) sum2 += h; Assert.AreEqual(enemy.Hp, sum2, "HP бойцов после урона = HP отряда");
+            int wounded = 0; foreach (var h in enemy.FighterHp) if (h < enemy.Squad.HpPerFighter) wounded++; Assert.LessOrEqual(wounded, 1, "урон снимался с бойцов по очереди, неполный — не больше одного");
             Assert.IsFalse(evs.Exists(e => e.Type == EventType.RetreatStarted), "отхода нет");
         }
 
@@ -106,7 +109,7 @@ namespace Warbands.Tests
                 var m = Headless.Play(ArmySetup.FromPreset(PresetId.StormWall), ArmySetup.FromPreset(PresetId.PlagueMarch), cfg, seed);
                 Assert.IsTrue(m.Ended); Assert.AreNotEqual(EndReason.ArmyDestroyed, m.EndReason, "гибель армии бой не заканчивает");
                 if (m.EndReason == EndReason.HeroDefeated) heroEnds++;
-                foreach (var sd in m.Sides) foreach (var q in sd.Squads) Assert.AreEqual(q.Count, q.Fighters.Count, "бойцы = живые: " + q.Name);
+                foreach (var sd in m.Sides) foreach (var q in sd.Squads) { Assert.AreEqual(q.Count, q.Fighters.Count, "бойцы = живые: " + q.Name); int sm = 0; foreach (var h in q.FighterHp) sm += h; Assert.AreEqual(Math.Max(0, q.Hp), sm, "HP бойцов = HP отряда: " + q.Name); }
             }
             Assert.Greater(heroEnds, 0, "хоть один бой из шести закончился смертью героя");
         }

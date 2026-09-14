@@ -7,14 +7,18 @@ namespace Warbands.Sim
     /// но каждый его боец стоит на своём гексе (`Unit.Fighters`), в гексе до Cap бойцов одной стороны. На ходу отряда каждый боец
     /// бежит к вражескому герою своим кратчайшим путём по расчищенному (могут разойтись по разным дорогам), ближник останавливается
     /// у первого встречного врага, дальник — когда кто-то в рейндже; бьют того, кого встретили (герой в приоритете).
-    /// Потери снимают бойцов, ближайших к атакующему; восстановление добавляет бойцов рядом со своими.
+    /// У каждого бойца своё HP (FighterHp), урон снимается с ближайших к атакующему; вражеские бойцы не стена — дерутся вперемешку в одном гексе.
     public static class FlowLogic
     {
         public const int Cap = 8;   // бойцов одной стороны в гексе
 
         public static void InitFighters(BattleState s)
         {
-            foreach (var sd in s.Sides) foreach (var q in sd.Squads) { q.Fighters = new List<Cell>(); for (int i = 0; i < q.Count; i++) q.Fighters.Add(q.Cell); }
+            foreach (var sd in s.Sides) foreach (var q in sd.Squads)
+            {
+                q.Fighters = new List<Cell>(); q.FighterHp = new List<int>(); int left = q.Hp, hpf = q.Squad.HpPerFighter;
+                while (left > 0) { q.Fighters.Add(q.Cell); q.FighterHp.Add(Math.Min(hpf, left)); left -= hpf; }
+            }
         }
 
         /// Сколько своих бойцов стоит в гексе.
@@ -44,18 +48,23 @@ namespace Warbands.Sim
         public static bool Passable(BattleState s, Cell c, int side, HashSet<Cell> alsoOpen = null)
         {
             if (!BushGrid.Inside(c) || s.Bushes.IsObstacle(c) || (s.Bushes.IsBush(c) && (alsoOpen == null || !alsoOpen.Contains(c)))) return false;
-            if (EnemyAt(s, c, side) != null) return false;
+            var eh = s.Sides[1 - side].Hero; if (eh != null && eh.Alive && eh.Cell == c) return false;   // гекс героя — стена; вражеские бойцы — нет: дерёмся вперемешку (автор 14.09)
             var mh = s.Sides[side].Hero; return mh == null || !mh.Alive || mh.Cell != c;
         }
         /// Враг рядом с гексом: герой в приоритете, иначе отряд с наименьшим HP среди соседних.
         public static Unit AdjacentEnemy(BattleState s, int side, Cell at)
         {
             var h = s.Sides[1 - side].Hero; if (h != null && h.Alive && BushGrid.Adjacent(at, h.Cell)) return h;
-            Unit best = null;
+            Unit best = null; bool bestSame = false;
             foreach (var q in s.Sides[1 - side].Squads)
             {
                 if (!q.Alive || q.Fighters == null) continue;
-                foreach (var f in q.Fighters) if (BushGrid.Adjacent(at, f)) { if (best == null || q.Hp < best.Hp) best = q; break; }
+                foreach (var f in q.Fighters)
+                {
+                    bool same = f == at; if (!same && !BushGrid.Adjacent(at, f)) continue;
+                    if (best == null || (same && !bestSame) || (same == bestSame && q.Hp < best.Hp)) { best = q; bestSame = same; }   // в своём гексе — первым делом
+                    if (same) break;
+                }
             }
             return best;
         }
@@ -101,20 +110,45 @@ namespace Warbands.Sim
             foreach (var f in u.Fighters) { int d = h != null ? BushGrid.Steps(f, h.Cell) : 0; if (d < bd) { bd = d; best = f; } }
             return best;
         }
-        /// Потери: убрать лишних бойцов, начиная с ближайших к from (там был контакт); восстановление — добавить рядом со своими.
+        /// HP бойцов ↔ HP отряда (автор 14.09: у каждого бойца своё HP). Потери: урон снимается с бойцов, ближайших к from (там контакт),
+        /// боец с нулём умирает; лечение — сначала раненым, остаток — новыми бойцами рядом со своими. Число бойцов = Count (ceil(Hp/HpPerFighter)).
         public static void Sync(BattleState s, Unit u, Cell? from = null)
         {
             if (u == null || u.IsHero || u.Fighters == null) return;
-            if (!u.Alive) { u.Fighters.Clear(); return; }
-            var anchor = from ?? (s.Sides[1 - u.Side].Hero != null ? s.Sides[1 - u.Side].Hero.Cell : u.Cell);
-            while (u.Fighters.Count > u.Count && u.Fighters.Count > 0)
+            if (u.FighterHp == null || u.FighterHp.Count != u.Fighters.Count) { u.FighterHp = new List<int>(); int hpf0 = u.Squad.HpPerFighter; for (int i = 0; i < u.Fighters.Count; i++) u.FighterHp.Add(hpf0); }
+            if (!u.Alive) { u.Fighters.Clear(); u.FighterHp.Clear(); return; }
+            int hpf = u.Squad.HpPerFighter; var anchor = from ?? (s.Sides[1 - u.Side].Hero != null ? s.Sides[1 - u.Side].Hero.Cell : u.Cell);
+            int sum = 0; foreach (var h in u.FighterHp) sum += h;
+            int loss = sum - u.Hp;
+            while (loss > 0 && u.Fighters.Count > 0)
             {
-                int bi = 0; int bd = int.MaxValue;
+                int bi = 0, bd = int.MaxValue;   // ближайший к атакующему — первым
                 for (int i = 0; i < u.Fighters.Count; i++) { int d = BushGrid.Steps(u.Fighters[i], anchor); if (d < bd) { bd = d; bi = i; } }
-                u.Fighters.RemoveAt(bi);
+                int dmg = Math.Min(u.FighterHp[bi], loss); u.FighterHp[bi] -= dmg; loss -= dmg;
+                if (u.FighterHp[bi] <= 0) { u.Fighters.RemoveAt(bi); u.FighterHp.RemoveAt(bi); }
             }
-            int k = 0;
-            while (u.Fighters.Count < u.Count) { var at = u.Fighters.Count > 0 ? u.Fighters[k++ % u.Fighters.Count] : u.Cell; u.Fighters.Add(at); }
+            int gain = -loss;
+            if (gain > 0)
+            {
+                // лечение: раненым по возрастанию HP, остаток — новые бойцы рядом
+                for (int pass = 0; pass < 64 && gain > 0; pass++)
+                {
+                    int wi = -1, wh = hpf;
+                    for (int i = 0; i < u.FighterHp.Count; i++) if (u.FighterHp[i] < wh) { wh = u.FighterHp[i]; wi = i; }
+                    if (wi < 0) break;
+                    int add = Math.Min(hpf - u.FighterHp[wi], gain); u.FighterHp[wi] += add; gain -= add;
+                }
+                int k = 0;
+                while (gain > 0) { var at = u.Fighters.Count > 0 ? u.Fighters[k++ % u.Fighters.Count] : u.Cell; int add = Math.Min(hpf, gain); u.Fighters.Add(at); u.FighterHp.Add(add); gain -= add; }
+            }
+            // ровно Count бойцов: лишние (несколько неполных) сливаются в ближайшего неполного
+            while (u.Fighters.Count > u.Count && u.Fighters.Count > 1)
+            {
+                int li = 0; for (int i = 1; i < u.FighterHp.Count; i++) if (u.FighterHp[i] < u.FighterHp[li]) li = i;
+                int hp = u.FighterHp[li]; u.Fighters.RemoveAt(li); u.FighterHp.RemoveAt(li);
+                int ri = 0; for (int i = 1; i < u.FighterHp.Count; i++) if (u.FighterHp[i] < u.FighterHp[ri]) ri = i;
+                u.FighterHp[ri] = Math.Min(hpf, u.FighterHp[ri] + hp);
+            }
             u.Cell = Front(s, u);
         }
         public static void SyncAll(BattleState s) { foreach (var sd in s.Sides) foreach (var q in sd.Squads) Sync(s, q); }
