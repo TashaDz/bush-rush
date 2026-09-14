@@ -37,7 +37,8 @@ namespace Warbands.Sim
         public SquadDef Squad; public HeroDef Hero;
         public string Name;
         public int MaxHp, Hp, Initiative; public Row Row; public int Slot;
-        public Cell Cell; public Ref TargetRef = Ref.None; public Cell GoalCell; public bool GoalIsBonus;   // ветка bush-field: клетка и цель хода (враг/союзник или бонус на клетке)
+        public Cell Cell; public Ref TargetRef = Ref.None; public Cell GoalCell; public bool GoalIsBonus;
+        public List<Cell> Fighters;   // Bush Rush «как вода»: гекс каждого бойца (Count штук); Cell — передний боец   // ветка bush-field: клетка и цель хода (враг/союзник или бонус на клетке)
         public List<Status> Statuses = new List<Status>();
         public int FlatBonus;              // Spell Eaters: +25 к следующей атаке
         public int LinkTarget = -1;        // Spirit Weavers: кого связали
@@ -63,6 +64,7 @@ namespace Warbands.Sim
         public Unit Clone()
         {
             var u = (Unit)MemberwiseClone();
+            if (Fighters != null) u.Fighters = new List<Cell>(Fighters);
             u.Statuses = new List<Status>(Statuses.Count);
             foreach (var s in Statuses) u.Statuses.Add(s.Clone());
             return u;

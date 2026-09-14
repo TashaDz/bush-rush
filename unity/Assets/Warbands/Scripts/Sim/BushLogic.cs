@@ -23,6 +23,7 @@ namespace Warbands.Sim
 
         public static Unit OccupantAt(BattleState s, Cell c)
         {
+            if (s.Cfg.rushMode) return FlowLogic.AnyAt(s, c);   // «как вода»: бойцы по гексам
             foreach (var sd in s.Sides)
             {
                 foreach (var q in sd.Squads) if (q.Alive && q.Cell == c) return q;
@@ -41,10 +42,11 @@ namespace Warbands.Sim
         /// Проходима для стороны: внутри, без куста и препятствия, не занята врагом (свои проходимы, но встать на них нельзя).
         public static bool Passable(BattleState s, Cell c, int side, HashSet<Cell> alsoOpen = null)
         {
+            if (s.Cfg.rushMode) return FlowLogic.Passable(s, c, side, alsoOpen);
             if (!BushGrid.Inside(c) || s.Bushes.IsObstacle(c) || (s.Bushes.IsBush(c) && (alsoOpen == null || !alsoOpen.Contains(c)))) return false;
             var o = OccupantAt(s, c); return o == null || (o.Side == side && !o.IsHero);   // свой герой — тоже стена
         }
-        public static bool CanStand(BattleState s, Cell c, Unit actor) { var o = OccupantAt(s, c); return o == null || o == actor; }
+        public static bool CanStand(BattleState s, Cell c, Unit actor) { if (s.Cfg.rushMode) return FlowLogic.EnemyAt(s, c, actor.Side) == null && FlowLogic.OwnAt(s, c, actor.Side) < FlowLogic.Cap; var o = OccupantAt(s, c); return o == null || o == actor; }
 
         // ---------- BFS по расчищенным ----------
 

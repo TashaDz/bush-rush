@@ -56,10 +56,12 @@ namespace Warbands
         public sealed class UnitView
         {
             public Unit Unit; public Transform Root; public readonly List<Transform> Figs = new List<Transform>();
-            public int ShownHp; public Vector3 From, To; public List<Vector3> Path; public float MoveStart, MoveEnd; public bool Moving;
-            public float Punch;   // всплеск масштаба при ударе/попадании
-            public Vector3 HeadPos => Root.position + Vector3.up * (Unit != null && Unit.IsHero ? 1.5f : 0.75f);
+            public readonly List<FigJob> Jobs = new List<FigJob>();   // бег бойцов по своим путям («как вода»)
+            public int ShownHp; public float Punch;   // всплеск масштаба при ударе/попадании
+            public Vector3 Centroid;                   // центр видимых бойцов (плашка HP, прицел)
+            public Vector3 HeadPos => Centroid + Vector3.up * (Unit != null && Unit.IsHero ? 1.5f : 0.6f);
         }
+        public sealed class FigJob { public Transform Fig; public Vector3 From; public List<Vector3> Path; public float Start, End; }
         readonly List<UnitView> views = new List<UnitView>();
         public IReadOnlyList<UnitView> Views => views;
         public UnitView View(Ref r) { foreach (var v in views) if (v.Unit != null && v.Unit.Ref == r) return v; return null; }
@@ -127,8 +129,8 @@ namespace Warbands
         {
             if (cam == null) return;
             cam.orthographic = false; cam.nearClipPlane = 0.3f; cam.farClipPlane = 60f;
-            cam.transform.position = new Vector3(0f, 12.9f, -7.6f);
-            cam.transform.LookAt(new Vector3(0f, 0f, 0.9f));   // выше середины: своё поле уходит из-под нижних полосок HUD, герой врага — под верхней
+            cam.transform.position = new Vector3(0f, 14.2f, -5.2f);   // автор 14.09: красного героя выше — камера круче, поле занимает высоту экрана
+            cam.transform.LookAt(new Vector3(0f, 0f, 0.35f));   // выше середины: своё поле уходит из-под нижних полосок HUD, герой врага — под верхней
             ApplyViewport();
         }
         int lastW, lastH;
@@ -139,7 +141,7 @@ namespace Warbands
             // автор 14.09: «растяни на весь экран» — камера рисует на всё окно; поле по ширине подгоняется под колонку 9:16 (на широком экране по бокам видна трава)
             cam.rect = new Rect(0f, 0f, 1f, 1f);
             float aspect = 1080f / 1920f; float colW = Mathf.Min(w, h * aspect);
-            float colAspect = colW / h; const float HFov = 25.5f;   // поле 6.5 гексов чуть плотнее к краям колонки
+            float colAspect = colW / h; const float HFov = 26f;   // поле 6.5 гексов по ширине колонки
             cam.fieldOfView = 2f * Mathf.Atan(Mathf.Tan(HFov * 0.5f * Mathf.Deg2Rad) / colAspect) * Mathf.Rad2Deg;
             lastW = Screen.width; lastH = Screen.height;
         }
@@ -169,29 +171,32 @@ namespace Warbands
         UnitView BuildUnit(Unit u)
         {
             var v = new UnitView { Unit = u, ShownHp = u.Hp };
-            v.Root = new GameObject(u.Name).transform; v.Root.SetParent(unitsRoot, false); v.Root.position = CellPos(u.Cell);
+            v.Root = new GameObject(u.Name).transform; v.Root.SetParent(unitsRoot, false);
             LayoutFigs(v);
             return v;
         }
-        /// Толпа: капсулы по числу живых бойцов рядами в гексе; герой — один большой блок.
+        /// Боец i внутри своего гекса: смещение по сиду (до Cap бойцов в гексе не слипаются).
+        static Vector3 FigOffset(Unit u, int i) { float a = Hash(u.Index * 31 + i, u.Side * 7 + 1) * 6.283f, r = 0.12f + 0.24f * Hash(i * 5 + 2, u.Index * 13 + 5); return new Vector3(Mathf.Cos(a) * r, 0.22f, Mathf.Sin(a) * r * 0.8f); }
+        Vector3 FigWorld(Unit u, int i) => CellPos(u.Fighters != null && i < u.Fighters.Count ? u.Fighters[i] : u.Cell) + FigOffset(u, i);
+        /// Бойцы по своим гексам (Unit.Fighters); герой — один большой блок на своём гексе. Не трогает бойцов, которые сейчас бегут.
         void LayoutFigs(UnitView v)
         {
-            var u = v.Unit; int n = u.IsHero ? 1 : Mathf.Max(0, u.Count);
+            var u = v.Unit; int n = u.IsHero ? 1 : Mathf.Max(0, u.Fighters != null ? Mathf.Min(u.Fighters.Count, u.Count) : u.Count);
             while (v.Figs.Count < n)
             {
                 var f = Prim("F", u.IsHero ? boxMesh : pawnMesh, u.IsHero ? (u.Side == 0 ? assets.heroBlue : assets.heroRed) : (u.Side == 0 ? assets.blue : assets.red), v.Root);
+                f.localScale = u.IsHero ? new Vector3(0.7f, 1.2f, 0.7f) : new Vector3(0.16f, 0.3f, 0.16f);
                 v.Figs.Add(f);
             }
+            var sum = Vector3.zero; int on = 0;
             for (int i = 0; i < v.Figs.Count; i++)
             {
-                bool on = i < n; v.Figs[i].gameObject.SetActive(on); if (!on) continue;
-                if (u.IsHero) { v.Figs[i].localPosition = new Vector3(0f, 0.6f, 0f); v.Figs[i].localScale = new Vector3(0.7f, 1.2f, 0.7f); continue; }
-                int cols = Mathf.CeilToInt(Mathf.Sqrt(n * 1.3f)); int r = i / cols, c = i % cols; int inRow = Mathf.Min(cols, n - r * cols);
-                float step = Mathf.Min(0.22f, 0.8f / cols); float jx = (Hash(u.Index * 31 + i, u.Side * 7) - 0.5f) * step * 0.5f, jz = (Hash(i, u.Index * 13 + 5) - 0.5f) * step * 0.4f;
-                float rows = Mathf.CeilToInt(n / (float)cols);
-                v.Figs[i].localPosition = new Vector3((c - (inRow - 1) / 2f) * step + jx, 0.22f, (r - (rows - 1) / 2f) * step * 0.9f + jz + (u.Side == 0 ? 0f : 0f));
-                v.Figs[i].localScale = new Vector3(0.16f, 0.3f, 0.16f);
+                bool active = i < n; if (v.Figs[i].gameObject.activeSelf != active) v.Figs[i].gameObject.SetActive(active); if (!active) continue;
+                bool running = false; foreach (var j in v.Jobs) if (j.Fig == v.Figs[i]) { running = true; break; }
+                if (!running) v.Figs[i].position = u.IsHero ? CellPos(u.Cell) + new Vector3(0f, 0.6f, 0f) : FigWorld(u, i);
+                sum += v.Figs[i].position; on++;
             }
+            v.Centroid = on > 0 ? sum / on : CellPos(u.Cell);
         }
 
         void SetBonus(Cell c, BonusKind k, bool visible)
@@ -262,9 +267,20 @@ namespace Warbands
                         }
                     case EventType.MoveStarted:
                         {
-                            var path = BushGrid.Decode(e.Text); var v = View(e.Actor); if (v == null || path.Count == 0) break;
-                            float dur = (0.3f + path.Count * cfg.bushStepSeconds) * k; var pts = new List<Vector3>(); foreach (var c in path) pts.Add(CellPos(c));
-                            float start = t; timed.Add((start, () => { v.Path = pts; v.From = v.Root.position; v.MoveStart = Time.unscaledTime; v.MoveEnd = Time.unscaledTime + dur; v.Moving = true; }));
+                            var v = View(e.Actor); if (v == null || e.Value <= 0) break;
+                            var runs = FlowLogic.DecodePaths(e.Text); var u = v.Unit;
+                            float dur = (0.3f + e.Value * cfg.bushStepSeconds) * k; float start = t;
+                            timed.Add((start, () =>
+                            {
+                                v.Jobs.Clear();
+                                for (int i = 0; i < runs.Count && i < v.Figs.Count; i++)
+                                {
+                                    var (st, path) = runs[i]; if (path.Count == 0) continue;
+                                    var pts = new List<Vector3>(); foreach (var c in path) pts.Add(CellPos(c) + FigOffset(u, i));
+                                    float d = (0.3f + path.Count * cfg.bushStepSeconds) * k;
+                                    v.Jobs.Add(new FigJob { Fig = v.Figs[i], From = v.Figs[i].position, Path = pts, Start = Time.unscaledTime, End = Time.unscaledTime + d });
+                                }
+                            }));
                             t += dur; moveEnd = t;
                             break;
                         }
@@ -303,12 +319,18 @@ namespace Warbands
             TickReticle(now, dt);
             foreach (var v in views)
             {
-                if (v.Moving)
+                if (v.Jobs.Count > 0)
                 {
-                    float u = Mathf.Clamp01((now - v.MoveStart) / Mathf.Max(0.01f, v.MoveEnd - v.MoveStart));
-                    v.Root.position = Along(v.From, v.Path, u);
-                    float hop = Mathf.Abs(Mathf.Sin(u * v.Path.Count * Mathf.PI)) * 0.08f; v.Root.position += Vector3.up * hop;
-                    if (u >= 1f) { v.Moving = false; v.Root.position = v.Path[v.Path.Count - 1]; }
+                    var sum = Vector3.zero; int on = 0;
+                    for (int i = v.Jobs.Count - 1; i >= 0; i--)
+                    {
+                        var j = v.Jobs[i]; float u = Mathf.Clamp01((now - j.Start) / Mathf.Max(0.01f, j.End - j.Start));
+                        var p = Along(j.From, j.Path, u); p.y += Mathf.Abs(Mathf.Sin(u * j.Path.Count * Mathf.PI)) * 0.08f; j.Fig.position = p;
+                        if (u >= 1f) { j.Fig.position = j.Path[j.Path.Count - 1]; v.Jobs.RemoveAt(i); }
+                    }
+                    foreach (var f in v.Figs) if (f.gameObject.activeSelf) { sum += f.position; on++; }
+                    if (on > 0) v.Centroid = sum / on;
+                    if (v.Jobs.Count == 0) LayoutFigs(v);
                 }
                 if (v.Punch > 0f) { v.Punch = Mathf.Max(0f, v.Punch - dt * 3f); float sc = 1f + 0.25f * v.Punch; v.Root.localScale = new Vector3(sc, 1f + 0.4f * v.Punch, sc); }
                 else if (v.Root.localScale != Vector3.one) v.Root.localScale = Vector3.one;
@@ -328,7 +350,7 @@ namespace Warbands
             if (reticleT < TurnIn) { float k = reticleT / TurnIn; float e = 1f - (1f - k) * (1f - k) * (1f - k); size = Mathf.Lerp(16f, 1f, e); alpha = Mathf.Lerp(0.35f, 1f, e); }
             else if (reticleT < TurnIn + TurnHold) { float k = (reticleT - TurnIn) / TurnHold; size = 1f + 0.1f * Mathf.Sin(k * Mathf.PI); alpha = 1f; }
             else { size = 1f + 0.03f * Mathf.Sin(now * 4f); alpha = 0.85f; }
-            float land = Mathf.Clamp01(reticleT / TurnIn); reticle.position = v.Root.position + Vector3.up * Mathf.Lerp(GrassH + 0.08f, 0.06f, land);   // летит над травой, садится на землю у ног
+            float land = Mathf.Clamp01(reticleT / TurnIn); var cen = v.Centroid; cen.y = 0f; reticle.position = cen + Vector3.up * Mathf.Lerp(GrassH + 0.08f, 0.06f, land);   // летит над травой, садится на землю у ног
             reticle.localScale = new Vector3(size, 1f, size);
             reticle.localRotation = Quaternion.Euler(0f, (1f - Mathf.Clamp01(reticleT / TurnIn)) * 90f, 0f);
             var col = reticleMine ? new Color(1f, 0.85f, 0.24f, alpha) : new Color(1f, 0.36f, 0.36f, alpha);

@@ -5,7 +5,7 @@ namespace Warbands.Sim
 {
     /// §18.2: Command → BattleResolver → CombatEvent[]. Детерминированный, без ссылок на Unity.
     /// Один и тот же резолвер обслуживает игрока, бота, автоплей и тесты.
-    public static class BattleResolver
+    public static partial class BattleResolver
     {
         // ---------- создание ----------
 
@@ -20,7 +20,7 @@ namespace Warbands.Sim
             if (cfg.bushField)
             {
                 foreach (var sd in s.Sides) foreach (var q in sd.Squads) s.Bushes.Clear(q.Cell, -1000);   // под отрядами чисто
-                if (cfg.rushMode) foreach (var sd in s.Sides) { sd.Hero.Cell = BushGrid.HeroCell(sd.Index); s.Bushes.Clear(sd.Hero.Cell, -1000); }   // Bush Rush: герои на поле по центру своих краёв
+                if (cfg.rushMode) { foreach (var sd in s.Sides) { sd.Hero.Cell = BushGrid.HeroCell(sd.Index); s.Bushes.Clear(sd.Hero.Cell, -1000); } FlowLogic.InitFighters(s); }   // Bush Rush: герои на поле по центру своих краёв; бойцы — по гексам
                 BushLogic.Generate(s);   // препятствия и бонусы
             }
             var evs = new List<CombatEvent>();
@@ -384,6 +384,7 @@ namespace Warbands.Sim
                     break;
             }
 
+            if (s.Cfg.rushMode) FlowLogic.SyncAll(s);   // ульты/лечение меняют число бойцов — расставить
             if (!s.Ended) { s.QueuePos++; BeginTurn(s, evs); }
             return evs;
         }
@@ -513,6 +514,7 @@ namespace Warbands.Sim
                 var cleared = new List<Cell>(); foreach (var c in cmd.Cells) if (s.Bushes.IsBush(c)) { s.Bushes.Clear(c, s.TurnIndex); cleared.Add(c); }   // в линии могут быть и чистые гексы — только траектория
                 if (cleared.Count > 0) Emit(s, evs, EventType.BushCleared, actor.Ref, Ref.None, cleared.Count).Text = BushGrid.Encode(cleared);
             }
+            if (s.Cfg.rushMode) { DoFlowTurn(s, actor, evs); return; }   // Bush Rush «как вода»: бойцы по гексам, каждый сам бежит к герою
             // цель хода считается сейчас, в момент бега — после расчистки, с учётом того, что достижимо (автор 10.09)
             Goal goal = BushLogic.PickGoal(s, actor); actor.TargetRef = goal.Unit != null ? goal.Unit.Ref : Ref.None; actor.GoalCell = goal.Cell; actor.GoalIsBonus = goal.IsBonus;
             var target = goal.Unit;
