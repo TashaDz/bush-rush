@@ -74,8 +74,9 @@ namespace Warbands.Sim
             return new Cell(col, y);
         }
 
-        /// Гекс героя (Bush Rush, автор 14.09): по центру своего края — игрок снизу (2, Rows-1), враг сверху (3, 0); нечётная строка сдвинута на полгекса, так что оба у середины поля.
-        public static Cell HeroCell(int side) => side == 0 ? new Cell(Cols / 2 - 1, Rows - 1) : new Cell(Cols / 2, 0);
+        /// Гекс героя (Bush Rush, автор 14.09): игрок снизу (2, Rows-1) на поле; враг — за верхним краем, на «площадке» (2, -1) (автор 14.09: «переставь красного героя сюда»).
+        /// Гекс вне сетки: соседство/дистанции считаются как обычно (кубовые координаты), бойцы туда не ступают (Passable требует Inside), бьют с (2,0) и (3,0).
+        public static Cell HeroCell(int side) => side == 0 ? new Cell(Cols / 2 - 1, Rows - 1) : new Cell(Cols / 2 - 1, -1);
 
         public static string Encode(IList<Cell> cells) { if (cells == null) return ""; var sb = new System.Text.StringBuilder(); for (int i = 0; i < cells.Count; i++) { if (i > 0) sb.Append(';'); sb.Append(cells[i].X).Append(',').Append(cells[i].Y); } return sb.ToString(); }
         public static List<Cell> Decode(string s)

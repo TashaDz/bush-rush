@@ -18,7 +18,8 @@ namespace Warbands.Tests
         {
             var s = New();
             Assert.AreEqual(BushGrid.HeroCell(0), s.Sides[0].Hero.Cell); Assert.AreEqual(BushGrid.HeroCell(1), s.Sides[1].Hero.Cell);
-            Assert.AreEqual(BushGrid.Rows - 1, s.Sides[0].Hero.Cell.Y); Assert.AreEqual(0, s.Sides[1].Hero.Cell.Y);
+            Assert.AreEqual(BushGrid.Rows - 1, s.Sides[0].Hero.Cell.Y); Assert.AreEqual(-1, s.Sides[1].Hero.Cell.Y, "красный герой за верхним краем (автор 14.09)");
+            Assert.IsTrue(BushGrid.Adjacent(s.Sides[1].Hero.Cell, new Cell(2, 0)) && BushGrid.Adjacent(s.Sides[1].Hero.Cell, new Cell(3, 0)), "к герою за краем подходят с (2,0) и (3,0)");
             foreach (var sd in s.Sides) foreach (var q in sd.Squads)
             {
                 Assert.AreEqual(q.Count, q.Fighters.Count, "по бойцу на живого: " + q.Name);

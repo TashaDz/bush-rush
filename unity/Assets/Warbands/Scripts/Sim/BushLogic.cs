@@ -589,7 +589,7 @@ namespace Warbands.Sim
         {
             var b = s.Bushes; if (b == null) return;
             int nObs = s.Cfg.bushObstacles, nBon = s.Cfg.bushBonuses;
-            var units = new List<Cell>(); foreach (var sd in s.Sides) { foreach (var q in sd.Squads) if (q.Alive) { units.Add(q.Cell); if (s.Cfg.rushMode && q.Fighters != null) foreach (var f in q.Fighters) if (!units.Contains(f)) units.Add(f); } if (s.Cfg.rushMode && sd.Hero != null) units.Add(sd.Hero.Cell); }   // Bush Rush: лагерь бойцов тоже без препятствий
+            var units = new List<Cell>(); foreach (var sd in s.Sides) { foreach (var q in sd.Squads) if (q.Alive) { units.Add(q.Cell); if (s.Cfg.rushMode && q.Fighters != null) foreach (var f in q.Fighters) if (!units.Contains(f)) units.Add(f); } if (s.Cfg.rushMode && sd.Hero != null && BushGrid.Inside(sd.Hero.Cell)) units.Add(sd.Hero.Cell); }   // Bush Rush: лагерь бойцов тоже без препятствий; герой за краем в связность не входит
             for (int attempt = 0; attempt < 40 && nObs > 0; attempt++)
             {
                 var obs = new HashSet<Cell>();

@@ -1,0 +1,30 @@
+win rate of ROW preset vs COLUMN preset (A side), 20 seeds per pair, bot Normal
+              Grave   Sustai  Rage L  Execut  Magic   Lastin  Bone T  Plague  Radian  Storm   Thunde  Arcane  
+Grave Cycle    50%      0%      5%      5%     25%      5%      0%     55%     15%      0%     35%     10%    
+Sustained Fire100%     60%     95%     95%     55%    100%     60%    100%    100%     75%    100%     85%    
+Rage Link      90%      5%     55%     35%     15%     55%     55%     65%     80%     15%     95%     10%    
+Execution Chain 90%      5%     55%     60%     40%     65%     65%     65%     90%     40%     90%     15%    
+Magic Eaters   90%     20%     70%     30%     50%     95%     50%     85%     95%     55%     95%     45%    
+Lasting Light  80%      0%     35%     85%      0%     45%     20%     90%     85%     20%    100%      5%    
+Bone Tide      95%     35%     65%     50%     55%     95%     70%     85%    100%     55%     90%     65%    
+Plague March   65%      5%     25%     30%     10%     25%      5%     45%     40%      5%     65%     20%    
+Radiant Line   95%      0%     15%     20%      0%     40%      5%     55%     65%     20%     55%     10%    
+Storm Wall    100%     40%     70%     80%     50%    100%     50%    100%     95%     65%    100%     50%    
+Thunder Volley 45%      0%     15%     10%      0%     25%     20%     25%     35%      5%     55%      0%    
+Arcane Siege   95%     15%     85%     60%     60%     95%     25%     85%    100%     70%    100%     55%    
+
+preset          games  win%  ults med/q3/max  limitWins  shieldNeverRemovedWins
+Grave Cycle       480   17%    2/2/3            0      0
+Sustained Fire    480   85%    1/1/2            0      0
+Rage Link         480   49%    1/1/2            0      0
+Execution Chain   480   55%    1/1/2            0      0
+Magic Eaters      480   68%    1/1/1            0      0
+Lasting Light     480   43%    1/1/2            0      0
+Bone Tide         480   68%    2/4/14            0      0
+Plague March      480   29%    2/2/3            0      0
+Radiant Line      480   28%    1/1/2            1      1
+Storm Wall        480   70%    1/1/1            0      0
+Thunder Volley    480   19%    1/1/2            0      0
+Arcane Siege      480   70%    1/1/1            1      1
+
+round-limit endings: 0%  median final round: 7  avg actions/battle: 35.7

@@ -62,8 +62,9 @@ namespace Warbands
             public Vector3 HeadPos => Centroid + Vector3.up * (Unit != null && Unit.IsHero ? 1.5f : 1.0f);   // бойцы ×4 (14.09)
         }
         public sealed class FigJob { public Transform Fig; public Vector3 From; public List<Vector3> Path; public float Start, End; }
-        public sealed class Lunge { public Transform Fig; public Vector3 From, To; public float Start; }   // выпад к врагу и назад (0.44 с)
+        public sealed class Lunge { public Transform Fig, Target; public Vector3 From, To; public float Start; public bool Flinched; }   // выпад бойца к своему противнику и назад (0.44 с); на полпути противник вздрагивает
         readonly List<Lunge> lunges = new List<Lunge>();
+        readonly List<(Transform fig, Vector3 scale, float start)> flinches = new List<(Transform, Vector3, float)>();   // вздрагивание побитого бойца (0.24 с)
         readonly List<(Transform t, float born)> splats = new List<(Transform, float)>();   // кляксы на земле, тают за 8 с
         Mesh quadMesh; Texture2D splatTex;
         readonly Dictionary<Transform, Transform> icons = new Dictionary<Transform, Transform>();   // значок класса над бойцом
@@ -93,6 +94,13 @@ namespace Warbands
                 bushScale[i] = bushTarget[i] = 1f;   // уровень травы гекса (1 — заросло), из него строится мягкий ковёр (GrassCarpet)
                 var o = Prim("Obstacle", boxMesh, assets.obstacle, tilesRoot); o.localPosition = p + Vector3.up * 0.35f; o.localScale = new Vector3(0.9f, 0.7f, 0.9f); o.gameObject.SetActive(false); obstacles[i] = o;
                 var bn = Prim("Bonus", sphereMesh, assets.gold, tilesRoot); bn.localPosition = p + Vector3.up * 0.4f; bn.localScale = Vector3.one * 0.38f; bn.gameObject.SetActive(false); bonuses[i] = bn;
+            }
+            // площадка героя за краем поля (автор 14.09): песчаный гекс поверх травы под гексом героя вне сетки
+            for (int side = 0; side < 2; side++)
+            {
+                var hc = BushGrid.HeroCell(side); if (BushGrid.Inside(hc)) continue;
+                var pod = new GameObject("HeroPodium", typeof(MeshFilter), typeof(MeshRenderer)); pod.transform.SetParent(tilesRoot, false); pod.transform.localPosition = CellPos(hc) + Vector3.up * PodiumY;
+                pod.GetComponent<MeshFilter>().sharedMesh = hexMesh; var pm = pod.GetComponent<MeshRenderer>(); pm.sharedMaterial = assets.sand; pm.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; Tint(pm, assets.sand);
             }
             // трава (автор 14.09): мягкий сплошной ковёр с текстурой — сетка высот по уровням гексов, края плавные, свет запечён в вершины
             carpet = new GrassCarpet(root, assets.grassSoft, bushScale, reachMask);
@@ -164,7 +172,7 @@ namespace Warbands
                 SetBonus(c, b.Bushes.BonusAt(c), !bush);
                 Retint(i);
             }
-            foreach (var v in views) Destroy(v.Root.gameObject); views.Clear(); foreach (var kv in icons) Destroy(kv.Value.gameObject); icons.Clear(); foreach (var sp in splats) Destroy(sp.t.gameObject); splats.Clear(); lunges.Clear();
+            foreach (var v in views) Destroy(v.Root.gameObject); views.Clear(); foreach (var kv in icons) Destroy(kv.Value.gameObject); icons.Clear(); foreach (var sp in splats) Destroy(sp.t.gameObject); splats.Clear(); lunges.Clear(); flinches.Clear();
             foreach (var sd in b.Sides)
             {
                 foreach (var q in sd.Squads) views.Add(BuildUnit(q));
@@ -182,6 +190,8 @@ namespace Warbands
         }
         /// Слоты 2×2 в гексе (автор 14.09: бойцы ×4, до 4 в гексе); когда в гексе есть и враг, свои жмутся к своему краю (игрок — вниз), враг — к своему.
         public const float FigY = 0.35f;   // центр цилиндра высотой 0.64 над землёй
+        public const float PodiumY = GrassH * 1.15f + 0.02f;   // площадка героя вне сетки — поверх травы
+        static Vector3 HeroPos(Cell c) => CellPos(c) + Vector3.up * (BushGrid.Inside(c) ? 0.6f : PodiumY + 0.6f);
         static Vector3 SlotOffset(int slot, int side, bool mixed)
         {
             float x = (slot & 1) == 0 ? -0.2f : 0.2f, z = (slot & 2) == 0 ? -0.17f : 0.17f;
@@ -229,7 +239,7 @@ namespace Warbands
             {
                 bool active = i < n; if (v.Figs[i].gameObject.activeSelf != active) v.Figs[i].gameObject.SetActive(active); if (!active) continue;
                 bool running = false; foreach (var j in v.Jobs) if (j.Fig == v.Figs[i]) { running = true; break; }
-                if (!running) v.Figs[i].position = u.IsHero ? CellPos(u.Cell) + new Vector3(0f, 0.6f, 0f) : FigWorld(v, i);
+                if (!running) v.Figs[i].position = u.IsHero ? HeroPos(u.Cell) : FigWorld(v, i);
                 sum += v.Figs[i].position; on++;
             }
             v.Centroid = on > 0 ? sum / on : CellPos(u.Cell);
@@ -376,20 +386,26 @@ namespace Warbands
                     case EventType.BonusTaken: { var cells = BushGrid.Decode(e.Text); timed.Add((moveEnd, () => { foreach (var c in cells) SetBonus(c, BonusKind.None, false); })); break; }
                     case EventType.DamageApplied: case EventType.HealApplied:
                         {
-                            var tv = View(e.Target); var src = View(e.Actor); float at = moveEnd + 0.35f * k; bool heal = e.Type == EventType.HealApplied;
-                            timed.Add((at - 0.22f * k, () => { if (!heal && src != null && tv != null) LungeAt(src, tv); }));   // выпад к врагу
+                            // драка боец-на-бойца (автор 14.09: «не надо всех одновременно дёргать»): каждый боец атакующего отряда по очереди делает выпад
+                            // к ближайшему противнику, тот вздрагивает; HP, павшие и цифра урона — после последнего выпада
+                            var tv = View(e.Target); var src = View(e.Actor); bool heal = e.Type == EventType.HealApplied;
+                            int strikers = 0; if (!heal && src != null) foreach (var f in src.Figs) if (f.gameObject.activeSelf) strikers++;
+                            float step = strikers > 0 ? Mathf.Clamp(0.9f / strikers, 0.07f, 0.16f) * k : 0f; float start = moveEnd + 0.15f * k;
+                            float at = start + (strikers > 0 ? (strikers - 1) * step + 0.24f * k : 0.35f * k);
+                            if (strikers > 0) timed.Add((start, () => { if (src != null && tv != null) Strikes(src, tv, step / k); }));
                             timed.Add((at, () =>
                             {
                                 if (tv != null && tv.Unit != null)
                                 {
                                     var before = new List<Vector3>(); foreach (var f in tv.Figs) if (f.gameObject.activeSelf) before.Add(f.position);
-                                    tv.ShownHp = tv.Unit.Hp; tv.Punch = 1f; LayoutFigs(tv);
+                                    tv.ShownHp = tv.Unit.Hp; MatchFigs(tv); LayoutFigs(tv);
                                     int after = 0; foreach (var f in tv.Figs) if (f.gameObject.activeSelf) after++;
-                                    if (!heal && !tv.Unit.IsHero) for (int i = after; i < before.Count; i++) Splat(before[i], tv.Unit.Side);   // павшие — кляксы
+                                    if (!heal && !tv.Unit.IsHero) for (int i = after; i < before.Count; i++) Splat(before[i], tv.Unit.Side);   // павшие — кляксы там, где стояли побитые
+                                    if (tv.Unit.IsHero && !heal) Flinch(tv.Figs[0]);
                                 }
-                                if (src != null) src.Punch = 0.6f; Hit?.Invoke(e);
+                                Hit?.Invoke(e);
                             }));
-                            t = Mathf.Max(t, at + 0.5f * k);
+                            t = Mathf.Max(t, at + 0.35f * k);
                             break;
                         }
                     case EventType.SquadDefeated: { var tv = View(e.Target); float at = moveEnd + 0.7f * k; timed.Add((at, () => { if (tv != null) { tv.ShownHp = 0; LayoutFigs(tv); tv.Root.gameObject.SetActive(false); } })); break; }
@@ -401,17 +417,42 @@ namespace Warbands
             timed.Add((t + 0.05f, () => { var bb = runner.Battle; if (bb != null) { SetPending(PendingRegrow(bb)); foreach (var v in views) if (v.Unit != null && v.Unit.Alive) v.ShownHp = v.Unit.Hp; } }));
         }
         /// Выпад: каждый боец атакующего, у кого рядом (≤ 1.2) есть боец цели, дёргается к ближайшему и обратно; толпы смешиваются.
-        void LungeAt(UnitView src, UnitView tv)
+        /// Выпады по очереди: боец k атакующего отряда через k·step секунд делает выпад к ближайшему бойцу цели (ближники — почти вплотную,
+        /// стрелки издалека — короткий «толчок» в сторону цели); ближние к врагу бьют первыми.
+        void Strikes(UnitView src, UnitView tv, float step)
         {
-            var targets = new List<Vector3>(); foreach (var f in tv.Figs) if (f.gameObject.activeSelf) targets.Add(f.position);
+            var targets = new List<Transform>(); foreach (var f in tv.Figs) if (f.gameObject.activeSelf) targets.Add(f);
             if (targets.Count == 0) return;
+            var order = new List<(Transform f, Transform t, float d)>();
             foreach (var f in src.Figs)
             {
-                if (!f.gameObject.activeSelf) continue; Vector3 best = targets[0]; float bd = float.MaxValue;
-                foreach (var p in targets) { float d = (p - f.position).sqrMagnitude; if (d < bd) { bd = d; best = p; } }
-                if (bd > 1.44f) continue;
-                lunges.Add(new Lunge { Fig = f, From = f.position, To = Vector3.Lerp(f.position, best, 0.7f), Start = Time.unscaledTime });
+                if (!f.gameObject.activeSelf) continue; Transform best = targets[0]; float bd = float.MaxValue;
+                foreach (var p in targets) { float d = (p.position - f.position).sqrMagnitude; if (d < bd) { bd = d; best = p; } }
+                order.Add((f, best, bd));
             }
+            order.Sort((a, b) => a.d.CompareTo(b.d));
+            float now = Time.unscaledTime;
+            for (int k = 0; k < order.Count; k++)
+            {
+                var (f, tg, d) = order[k]; var dir = tg.position - f.position; dir.y = 0f; float len = dir.magnitude;
+                var to = len <= 1.2f ? Vector3.Lerp(f.position, new Vector3(tg.position.x, f.position.y, tg.position.z), 0.7f) : f.position + dir / Mathf.Max(len, 1e-3f) * 0.22f;
+                lunges.Add(new Lunge { Fig = f, Target = tg, From = f.position, To = to, Start = now + k * step });
+            }
+        }
+        void Flinch(Transform fig) { foreach (var fl in flinches) if (fl.fig == fig) return; flinches.Add((fig, fig.localScale, Time.unscaledTime)); }
+        /// Перед раскладкой после урона: Figs[i] ↔ Fighters[i] по ближайшей позиции, чтобы павшими (лишними) остались фигурки, стоявшие там, где бойцов не стало.
+        void MatchFigs(UnitView v)
+        {
+            var u = v.Unit; if (u == null || u.IsHero || u.Fighters == null) return;
+            var free = new List<Transform>(); foreach (var f in v.Figs) if (f.gameObject.activeSelf) free.Add(f); var inactive = new List<Transform>(); foreach (var f in v.Figs) if (!f.gameObject.activeSelf) inactive.Add(f);
+            var ordered = new List<Transform>();
+            for (int i = 0; i < u.Fighters.Count && free.Count > 0; i++)
+            {
+                var p = CellPos(u.Fighters[i]); Transform pick = null; float bd = float.MaxValue;
+                foreach (var f in free) { float d = (f.position - p).sqrMagnitude; if (d < bd) { bd = d; pick = f; } }
+                free.Remove(pick); ordered.Add(pick);
+            }
+            ordered.AddRange(free); ordered.AddRange(inactive); v.Figs.Clear(); v.Figs.AddRange(ordered);
         }
         /// Попадание/лечение показано (для всплывающих чисел в HUD).
         public event System.Action<CombatEvent> Hit;
@@ -451,9 +492,16 @@ namespace Warbands
             foreach (var bn in bonuses) if (bn.gameObject.activeSelf) bn.localRotation = Quaternion.Euler(0f, now * 90f, 0f);
             for (int i = lunges.Count - 1; i >= 0; i--)
             {
-                var l = lunges[i]; float u = (now - l.Start) / 0.44f;
+                var l = lunges[i]; float u = (now - l.Start) / 0.44f; if (u < 0f) continue;   // ещё ждёт своей очереди
                 if (u >= 1f) { l.Fig.position = l.From; lunges.RemoveAt(i); continue; }
                 float k2 = Mathf.Sin(u * Mathf.PI); l.Fig.position = Vector3.Lerp(l.From, l.To, k2) + Vector3.up * 0.06f * k2;
+                if (!l.Flinched && u >= 0.5f) { l.Flinched = true; if (l.Target != null && l.Target.gameObject.activeSelf) Flinch(l.Target); }
+            }
+            for (int i = flinches.Count - 1; i >= 0; i--)
+            {
+                var fl = flinches[i]; float u = (now - fl.start) / 0.24f;
+                if (u >= 1f || fl.fig == null) { if (fl.fig != null) fl.fig.localScale = fl.scale; flinches.RemoveAt(i); continue; }
+                float s2 = Mathf.Sin(u * Mathf.PI); fl.fig.localScale = new Vector3(fl.scale.x * (1f + 0.35f * s2), fl.scale.y * (1f - 0.22f * s2), fl.scale.z * (1f + 0.35f * s2));
             }
             for (int i = splats.Count - 1; i >= 0; i--)
             {

@@ -20,3 +20,7 @@
 
 20 сидов, бот Normal. Составы как в Warbands (10×50 … 6×67), ёмкость гекса 4, лагерь на старте, ульта 20/30. Диапазон **20–86** (Sustained Fire 86, Storm Wall 69, Magic Eaters 68, Arcane Siege 68, Bone Tide 64, Execution Chain 54, Rage Link 48, Lasting Light 46, Plague March 31, Radiant Line 26, Grave Cycle 20, Thunder Volley 20). Лимитов **0 %**, медиана 7 раундов, 35 действий. Ульт у Bone Tide до 11 за бой (некромант при 30 душах на дешёвой нежити) — стоит посмотреть отдельно. Картина та же, что в §2–3: разброс задаёт HP героя (В3).
 
+## 5. Красный герой за краем + драка боец-на-бойца (14.09) — `balance/matrix-12-presets-rush-v5-hero-edge.txt`
+
+20 сидов, бот Normal, правила §4, вражеский герой на (2,−1). Диапазон **17–85** (Sustained Fire 85, Storm Wall 70, Arcane Siege 70, Magic Eaters 68, Bone Tide 68, Execution Chain 55, Rage Link 49, Lasting Light 43, Plague March 29, Radiant Line 28, Thunder Volley 19, Grave Cycle 17). Лимитов **0 %**, медиана 7 раундов, 36 действий — как §4, лишний ряд до героя врага картину не сдвинул. Bone Tide до 14 ульт за бой (см. §4).
+
